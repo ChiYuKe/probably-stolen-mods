@@ -9,6 +9,8 @@
 
 - `EnergyBar/` —— 加一根"味道可疑的能量棒"。新开一局会放一根在后柜台，F9 开发面板里也能刷。
 
+后面写的 mod 也按这个结构放，一个 mod 一个文件夹，里面自带 manifest 和贴图，互相不干扰。
+
 ## 编译
 
 需要 .NET SDK，6 以上就行。先把 `EnergyBar/EnergyBar.csproj` 里的 `<GameDir>` 改成自己的游戏目录：
