@@ -23,7 +23,10 @@ namespace EnergyBar
         public void OnEnable()
         {
             ModHook.OnModItemDirectoryInit += RegisterItem;
-            ModHook.OnGameLoadedLate += OnGameLoaded;
+
+            // 读档和开新档是两条路，各挂一次
+            ModHook.OnGameLoadedLate += TryGive;
+            ModHook.OnNewGameStarted += OnNewGame;
 
             // F9 里能自己刷，测试方便
             ModHelper.AddDebugFunction(manifest.ID, "Modding", "能量棒 +1", SpawnOne);
@@ -32,7 +35,8 @@ namespace EnergyBar
         public void OnDisable()
         {
             ModHook.OnModItemDirectoryInit -= RegisterItem;
-            ModHook.OnGameLoadedLate -= OnGameLoaded;
+            ModHook.OnGameLoadedLate -= TryGive;
+            ModHook.OnNewGameStarted -= OnNewGame;
             ModHelper.RemoveDebugFunctions(manifest.ID);
         }
 
@@ -47,9 +51,16 @@ namespace EnergyBar
                 item.SetSpriteAndShapeFromMod(manifest.ID, "energy_bar");
                 return item;
             });
+
+            log.Log("物品目录初始化，能量棒已注册");
         }
 
-        private void OnGameLoaded()
+        private void OnNewGame(string scenarioId)
+        {
+            TryGive();
+        }
+
+        private void TryGive()
         {
             try
             {
@@ -61,13 +72,13 @@ namespace EnergyBar
                 var item = ModHelper.SpawnItem(ItemId);
                 if (item == null)
                 {
-                    log.Warning("能量棒没生成出来，看看贴图文件名对不对");
+                    log.Warning("能量棒没生成出来，多半是物品目录那边没注册上");
                     return;
                 }
 
-                ModHelper.MoveItemToBackCounter(item);
+                ModHelper.MoveItemToInventory(item);
                 ModHelper.SetModDataBool(manifest.ID, GivenKey, true);
-                log.Log("放了一根能量棒在后柜台");
+                log.Log("背包里塞了一根能量棒");
             }
             catch (Exception e)
             {
