@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>DebugPanelChinese</AssemblyName>
+    <!-- GameDir / Managed / 部署开关这些公共设置，见根目录的 Directory.Build.props -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(Managed)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(Managed)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(Managed)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(Managed)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 编译完直接丢进 Mods，省得每次手动拷；-p:DeployToMods=false 可以只编译 -->
+  <Target Name="ToMods" AfterTargets="Build" Condition="'$(DeployToMods)' != 'false'">
+    <Copy SourceFiles="$(TargetPath);manifest.xml" DestinationFolder="$(GameModsDir)\DebugPanelChinese" />
+  </Target>
+
+</Project>

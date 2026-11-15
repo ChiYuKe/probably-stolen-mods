@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>debug_panel_chinese</ID>
+  <Name>调试面板汉化</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>把 F9 调试面板、模组面板和物品生成器的界面文字换成中文。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>DebugPanelChinese.dll</Assembly>
+  </Assemblies>
+  <Capabilities />
+</Manifest>
