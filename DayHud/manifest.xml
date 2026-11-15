@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>day_hud</ID>
+  <Name>天数圆盘</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>在左上角加一个圆形天数面板，显示天数、星期和租金倒计时；悬停亮边，点击打开日历。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>DayHud.dll</Assembly>
+  </Assemblies>
+  <Capabilities />
+</Manifest>
