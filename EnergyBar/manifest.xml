@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>energy_bar</ID>
+  <Name>能量棒</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>加一根味道可疑的能量棒，新开一局会送一根。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>EnergyBar.dll</Assembly>
+  </Assemblies>
+  <Capabilities />
+</Manifest>
