@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>netease_cassette</ID>
+  <Name>网易云磁带机</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>给磁带播放器加一个网易云音乐入口：游戏内扫码登录，点歌后生成磁带，用原来的播放器直接放网易云的歌。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>NeteaseCassette.dll</Assembly>
+  </Assemblies>
+  <Capabilities>
+    <Capability>network</Capability>
+  </Capabilities>
+</Manifest>
