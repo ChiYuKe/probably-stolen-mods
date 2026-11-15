@@ -1,0 +1,41 @@
+<Project>
+
+  <!--
+    所有 mod 共用的编译设置，统一在这里管。
+    游戏安装位置只改下面这一处，所有项目（以及以后新加的 mod）都会跟着走。
+
+    临时或单次覆盖，用命令行 / 环境变量都行，不用改文件：
+      dotnet build ProbablyStolenMods.sln -c Release -p:GameDir="D:\Games\Probably Stolen"
+      set GameDir=D:\Games\Probably Stolen   （改完重开一个终端）
+  -->
+  <PropertyGroup>
+    <!-- 游戏装哪儿就改哪儿 -->
+    <GameDir Condition="'$(GameDir)' == ''">E:\SteamLibrary\steamapps\common\Probably Stolen</GameDir>
+    <!-- 游戏自己的 dll 都在这里：Assembly-CSharp、UnityEngine.*、0Harmony 等 -->
+    <Managed Condition="'$(Managed)' == ''">$(GameDir)\Probably Stolen_Data\Managed</Managed>
+    <!-- 编译产物的投放位置，默认就是游戏根目录的 Mods -->
+    <GameModsDir Condition="'$(GameModsDir)' == ''">$(GameDir)\Mods</GameModsDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <LangVersion Condition="'$(LangVersion)' == ''">latest</LangVersion>
+
+    <!--
+      true  = 编译完自动把 dll / manifest / 资源拷进 Mods（日常就用这个）
+      false = 只编译不部署，比如 CI 或者只想看看能不能编译过的时候：
+              dotnet build ProbablyStolenMods.sln -c Release -p:DeployToMods=false
+    -->
+    <DeployToMods Condition="'$(DeployToMods)' == ''">true</DeployToMods>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      一个 mod 文件夹里如果还放了辅助工具（比如 NeteaseCassette\tools\ApiProbe），
+      工具自己的 bin/obj 会被默认项扫描当成资源吃进来，引用解析就会跟游戏自带的 dll 打架
+      （典型症状是 CS1705：Newtonsoft.Json 的 System.Runtime 版本对不上）。
+      这些目录不是 mod 的一部分，统一排除。
+    -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);tools\**;**\bin\**;**\obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+</Project>

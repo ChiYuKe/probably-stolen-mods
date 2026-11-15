@@ -2,23 +2,21 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <LangVersion>latest</LangVersion>
     <AssemblyName>EnergyBar</AssemblyName>
-    <!-- 游戏装哪儿就改哪儿 -->
-    <GameDir>E:\SteamLibrary\steamapps\common\Probably Stolen</GameDir>
+    <!-- GameDir / Managed / 部署开关这些公共设置，见根目录的 Directory.Build.props -->
   </PropertyGroup>
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(GameDir)\Probably Stolen_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(Managed)\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(GameDir)\Probably Stolen_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(Managed)\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>$(GameDir)\Probably Stolen_Data\Managed\0Harmony.dll</HintPath>
+      <HintPath>$(Managed)\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
@@ -27,10 +25,10 @@
     <ModTexture Include="Textures\Items\*.png" />
   </ItemGroup>
 
-  <!-- 编译完直接丢进 Mods，省得每次手动拷 -->
-  <Target Name="ToMods" AfterTargets="Build">
-    <Copy SourceFiles="$(TargetPath);manifest.xml" DestinationFolder="$(GameDir)\Mods\EnergyBar" />
-    <Copy SourceFiles="@(ModTexture)" DestinationFolder="$(GameDir)\Mods\EnergyBar\Textures\Items" />
+  <!-- 编译完直接丢进 Mods，省得每次手动拷；-p:DeployToMods=false 可以只编译 -->
+  <Target Name="ToMods" AfterTargets="Build" Condition="'$(DeployToMods)' != 'false'">
+    <Copy SourceFiles="$(TargetPath);manifest.xml" DestinationFolder="$(GameModsDir)\EnergyBar" />
+    <Copy SourceFiles="@(ModTexture)" DestinationFolder="$(GameModsDir)\EnergyBar\Textures\Items" Condition="'@(ModTexture)' != ''" />
   </Target>
 
 </Project>

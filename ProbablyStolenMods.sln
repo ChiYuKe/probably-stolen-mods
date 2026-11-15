@@ -1,0 +1,57 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35913.81
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DayHud", "DayHud\DayHud.csproj", "{9FD1DC2C-5957-4570-9E52-54A8267978B2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DebugPanelChinese", "DebugPanelChinese\DebugPanelChinese.csproj", "{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnergyBar", "EnergyBar\EnergyBar.csproj", "{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NeteaseCassette", "NeteaseCassette\NeteaseCassette.csproj", "{AAC51FCD-F75B-483C-B885-593CBE5ADC55}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mods", "Mods", "{CF0EDA2C-0319-4301-98EF-25A917EEFC22}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{7376C6B6-8E78-4646-8584-DBFAFE965BED}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		Directory.Build.props = Directory.Build.props
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9FD1DC2C-5957-4570-9E52-54A8267978B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FD1DC2C-5957-4570-9E52-54A8267978B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FD1DC2C-5957-4570-9E52-54A8267978B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FD1DC2C-5957-4570-9E52-54A8267978B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9FD1DC2C-5957-4570-9E52-54A8267978B2} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
+		{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
+		{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
+		{AAC51FCD-F75B-483C-B885-593CBE5ADC55} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AD25219F-FD5E-46D8-A8A6-6608AE276310}
+	EndGlobalSection
+EndGlobal

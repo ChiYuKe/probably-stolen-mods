@@ -2,3 +2,7 @@ bin/
 obj/
 *.user
 .vs/
+
+# Visual Studio 的本地缓存
+*.suo
+*.sln.docstates
