@@ -24,12 +24,16 @@ namespace EnergyBar
         {
             ModHook.OnModItemDirectoryInit += RegisterItem;
             ModHook.OnGameLoadedLate += OnGameLoaded;
+
+            // F9 里能自己刷，测试方便
+            ModHelper.AddDebugFunction(manifest.ID, "Modding", "能量棒 +1", SpawnOne);
         }
 
         public void OnDisable()
         {
             ModHook.OnModItemDirectoryInit -= RegisterItem;
             ModHook.OnGameLoadedLate -= OnGameLoaded;
+            ModHelper.RemoveDebugFunctions(manifest.ID);
         }
 
         private void RegisterItem(ModItemDirectory dir)
@@ -68,6 +72,15 @@ namespace EnergyBar
             catch (Exception e)
             {
                 log.Error("送能量棒的时候崩了：" + e);
+            }
+        }
+
+        private void SpawnOne()
+        {
+            var item = ModHelper.SpawnItem(ItemId);
+            if (item != null)
+            {
+                ModHelper.MoveItemToInventory(item);
             }
         }
     }
