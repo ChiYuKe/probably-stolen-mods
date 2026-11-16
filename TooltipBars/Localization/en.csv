@@ -1,0 +1,2 @@
+config_solid_bars,Solid progress bars
+config_solid_bars_tip,Replaces the [====] text bars in item tooltips with real UI progress bars.
