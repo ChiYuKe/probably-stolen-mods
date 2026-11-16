@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>object_grabber</ID>
+  <Name>对象获取器</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>F9 特殊栏里的对象拾取浮球：拖动浮球读取下面的物品、机器、角色或 UI，显示名字、ID、数值和组件信息。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>ObjectGrabber.dll</Assembly>
+  </Assemblies>
+  <Capabilities />
+</Manifest>

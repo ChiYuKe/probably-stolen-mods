@@ -12,12 +12,43 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NeteaseCassette", "NeteaseC
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mods", "Mods", "{CF0EDA2C-0319-4301-98EF-25A917EEFC22}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Game API (decompiled, read-only reference)", "Game API (decompiled, read-only reference)", "{F45505D2-1A85-4136-93B6-2D207BE1DB33}"
+	ProjectSection(SolutionItems) = preProject
+		.decompile\CustomUIBuilder.cs = .decompile\CustomUIBuilder.cs
+		.decompile\CustomUIDebugPanel.cs = .decompile\CustomUIDebugPanel.cs
+		.decompile\CustomUIDebugWindows.cs = .decompile\CustomUIDebugWindows.cs
+		.decompile\CustomUIElement.cs = .decompile\CustomUIElement.cs
+		.decompile\CustomUIItemSpawner.cs = .decompile\CustomUIItemSpawner.cs
+		.decompile\CustomUIManager.cs = .decompile\CustomUIManager.cs
+		.decompile\CustomUITooltipTrigger.cs = .decompile\CustomUITooltipTrigger.cs
+		.decompile\CustomUIWindow.cs = .decompile\CustomUIWindow.cs
+		.decompile\DebugPanel.cs = .decompile\DebugPanel.cs
+		.decompile\DevTools.cs = .decompile\DevTools.cs
+		.decompile\FontLoader.cs = .decompile\FontLoader.cs
+		.decompile\IMod.cs = .decompile\IMod.cs
+		.decompile\ItemSpawner.cs = .decompile\ItemSpawner.cs
+		.decompile\LoadedMod.cs = .decompile\LoadedMod.cs
+		.decompile\LocalizedLines.cs = .decompile\LocalizedLines.cs
+		.decompile\ModCapability.cs = .decompile\ModCapability.cs
+		.decompile\ModHelper.cs = .decompile\ModHelper.cs
+		.decompile\ModHook.cs = .decompile\ModHook.cs
+		.decompile\ModLoader.cs = .decompile\ModLoader.cs
+		.decompile\ModLog.cs = .decompile\ModLog.cs
+		.decompile\ModManifest.cs = .decompile\ModManifest.cs
+		.decompile\ModScanner.cs = .decompile\ModScanner.cs
+		.decompile\ModScanResult.cs = .decompile\ModScanResult.cs
+		.decompile\TMPLocalizer.cs = .decompile\TMPLocalizer.cs
+		.decompile\TooltipContainer.cs = .decompile\TooltipContainer.cs
+	EndProjectSection
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{7376C6B6-8E78-4646-8584-DBFAFE965BED}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
 		Directory.Build.props = Directory.Build.props
 		README.md = README.md
 	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ObjectGrabber", "ObjectGrabber\ObjectGrabber.csproj", "{056B8BE9-8899-4536-9883-33BF983A23F9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +72,10 @@ Global
 		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AAC51FCD-F75B-483C-B885-593CBE5ADC55}.Release|Any CPU.Build.0 = Release|Any CPU
+		{056B8BE9-8899-4536-9883-33BF983A23F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{056B8BE9-8899-4536-9883-33BF983A23F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{056B8BE9-8899-4536-9883-33BF983A23F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{056B8BE9-8899-4536-9883-33BF983A23F9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -50,6 +85,7 @@ Global
 		{D1DD3B92-1717-4803-9BB4-7943DA8AFDB0} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
 		{F1A0FF8D-A02E-4CBF-93D9-7AE63C8C8917} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
 		{AAC51FCD-F75B-483C-B885-593CBE5ADC55} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
+		{056B8BE9-8899-4536-9883-33BF983A23F9} = {CF0EDA2C-0319-4301-98EF-25A917EEFC22}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AD25219F-FD5E-46D8-A8A6-6608AE276310}
