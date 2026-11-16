@@ -12,8 +12,9 @@ namespace ObjectGrabber
     {
         public string Header;
         public string Body;
+        public GameObject Target;
 
-        public static InspectResult Make(string header, IEnumerable<string> lines)
+        public static InspectResult Make(string header, IEnumerable<string> lines, GameObject target = null)
         {
             StringBuilder builder = new StringBuilder();
             foreach (string line in lines)
@@ -34,7 +35,8 @@ namespace ObjectGrabber
             return new InspectResult
             {
                 Header = string.IsNullOrEmpty(header) ? "对象获取器" : header,
-                Body = builder.ToString()
+                Body = builder.ToString(),
+                Target = target
             };
         }
     }
@@ -290,7 +292,24 @@ namespace ObjectGrabber
                 // 元素没有 RectTransform
             }
 
-            return InspectResult.Make(header, lines);
+            GameObject targetObject = renderObject;
+            if (targetObject == null)
+            {
+                try
+                {
+                    RectTransform rectTransform = element.rectTransform;
+                    if (rectTransform != null)
+                    {
+                        targetObject = rectTransform.gameObject;
+                    }
+                }
+                catch (Exception)
+                {
+                    // 元素没有可用的渲染节点
+                }
+            }
+
+            return InspectResult.Make(header, lines, targetObject);
         }
 
         private static InspectResult FromUi(GameObject hitObject)
@@ -358,7 +377,7 @@ namespace ObjectGrabber
             }
 
             Line(lines, "组件", ComponentSummary(hitObject));
-            return InspectResult.Make(header, lines);
+            return InspectResult.Make(header, lines, hitObject);
         }
 
         private static InspectResult FromWorld(Collider2D collider)
@@ -395,7 +414,7 @@ namespace ObjectGrabber
             }
 
             Line(lines, "组件", ComponentSummary(hitObject));
-            return InspectResult.Make(header, lines);
+            return InspectResult.Make(header, lines, hitObject);
         }
 
         private static Collider2D FindWorldCollider(Vector2 screenPosition)

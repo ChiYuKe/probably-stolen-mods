@@ -16,12 +16,16 @@ namespace ObjectGrabber
         private static readonly Color FooterColor = new Color(0.50f, 0.50f, 0.56f, 1f);
         private static readonly Color PanelColor = new Color(0.055f, 0.06f, 0.075f, 0.94f);
         private static readonly Color AccentColor = new Color(0.91f, 0.64f, 0.24f, 0.92f);
+        private static readonly Color OutlineColor = new Color(1f, 0.16f, 0.16f, 0.96f);
 
         private const float PanelWidth = 400f;
         private const float BallSize = 48f;
+        private const float OutlinePadding = 3f;
 
-        private RectTransform canvasRect;        private RectTransform ballRect;
+        private RectTransform canvasRect;
+        private RectTransform ballRect;
         private RectTransform panelRect;
+        private RectTransform outlineRect;
         private Image ballImage;
         private TextMeshProUGUI headerText;
         private TextMeshProUGUI bodyText;
@@ -29,6 +33,11 @@ namespace ObjectGrabber
 
         private Sprite ballSprite;
         private Sprite panelSprite;
+        private Sprite outlineSprite;
+        private GameObject highlighted;
+
+        private readonly Vector3[] uiCorners = new Vector3[4];
+        private readonly Vector3[] worldCorners = new Vector3[8];
 
         private TMP_FontAsset font;
         private float nextFontCheck;
@@ -71,6 +80,7 @@ namespace ObjectGrabber
             nextInspect = 0f;
             EnsureFont();
             PositionPanel();
+            UpdateOutline();
         }
 
         private void Update()
@@ -111,6 +121,7 @@ namespace ObjectGrabber
             }
 
             PositionPanel();
+            UpdateOutline();
         }
 
         public void Close()
@@ -154,6 +165,14 @@ namespace ObjectGrabber
         {
             canvasRect = transform as RectTransform;
 
+            if (canvasRect != null)
+            {
+                Debug.Log("[对象获取器] canvas=" + canvasRect.rect.size +
+                          " pivot=" + canvasRect.pivot +
+                          " scale=" + canvasRect.localScale +
+                          " screen=" + Screen.width + "x" + Screen.height);
+            }
+
             font = ResolveFont();
             if (font == null)
             {
@@ -162,7 +181,9 @@ namespace ObjectGrabber
 
             panelSprite = CreateRoundedSprite(32, 8);
             ballSprite = CreateCircleSprite(64);
+            outlineSprite = CreateOutlineSprite(16, 3);
 
+            BuildOutline();
             BuildPanel();
             BuildBall();
 
@@ -171,6 +192,29 @@ namespace ObjectGrabber
             footerText.text = "拖动浮球拾取 · 右键关闭 · Esc 退出";
             lastHeader = headerText.text;
             lastBody = bodyText.text;
+        }
+
+        private void BuildOutline()
+        {
+            GameObject outline = new GameObject(
+                "TargetOutline",
+                typeof(RectTransform),
+                typeof(Image));
+            outline.transform.SetParent(transform, false);
+
+            outlineRect = (RectTransform)outline.transform;
+            outlineRect.anchorMin = new Vector2(0.5f, 0.5f);
+            outlineRect.anchorMax = new Vector2(0.5f, 0.5f);
+            outlineRect.pivot = new Vector2(0.5f, 0.5f);
+            outlineRect.sizeDelta = new Vector2(100f, 100f);
+
+            Image image = outline.GetComponent<Image>();
+            image.sprite = outlineSprite;
+            image.type = Image.Type.Sliced;
+            image.color = OutlineColor;
+            image.raycastTarget = false;
+
+            outline.SetActive(false);
         }
 
         private void BuildPanel()
@@ -184,8 +228,8 @@ namespace ObjectGrabber
             panel.transform.SetParent(transform, false);
 
             panelRect = (RectTransform)panel.transform;
-            panelRect.anchorMin = Vector2.zero;
-            panelRect.anchorMax = Vector2.zero;
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0f, 1f);
             panelRect.sizeDelta = new Vector2(PanelWidth, 120f);
 
@@ -248,8 +292,8 @@ namespace ObjectGrabber
             ball.transform.SetParent(transform, false);
 
             ballRect = (RectTransform)ball.transform;
-            ballRect.anchorMin = Vector2.zero;
-            ballRect.anchorMax = Vector2.zero;
+            ballRect.anchorMin = new Vector2(0.5f, 0.5f);
+            ballRect.anchorMax = new Vector2(0.5f, 0.5f);
             ballRect.pivot = new Vector2(0.5f, 0.5f);
             ballRect.sizeDelta = new Vector2(BallSize, BallSize);
 
@@ -403,6 +447,8 @@ namespace ObjectGrabber
                 return;
             }
 
+            SetHighlightTarget(result.Target);
+
             if (string.Equals(result.Header, lastHeader) && string.Equals(result.Body, lastBody))
             {
                 return;
@@ -478,6 +524,233 @@ namespace ObjectGrabber
             }
 
             panelRect.anchoredPosition = new Vector2(x, y);
+        }
+
+        private void SetHighlightTarget(GameObject target)
+        {
+            if (target != null && (target == gameObject || target.transform.IsChildOf(transform)))
+            {
+                target = null;
+            }
+
+            highlighted = target;
+            UpdateOutline();
+        }
+
+        private void UpdateOutline()
+        {
+            if (outlineRect == null || canvasRect == null)
+            {
+                return;
+            }
+
+            GameObject target = highlighted;
+            if (target == null || !target.activeInHierarchy)
+            {
+                HideOutline();
+                return;
+            }
+
+            Rect screenRect;
+            if (!TryGetScreenRect(target, out screenRect))
+            {
+                HideOutline();
+                return;
+            }
+
+            if (screenRect.width <= 0.5f || screenRect.height <= 0.5f ||
+                float.IsNaN(screenRect.width) || float.IsNaN(screenRect.height))
+            {
+                HideOutline();
+                return;
+            }
+
+            if (screenRect.xMax < 0f || screenRect.yMax < 0f ||
+                screenRect.xMin > Screen.width || screenRect.yMin > Screen.height)
+            {
+                HideOutline();
+                return;
+            }
+
+            if (screenRect.width > Screen.width * 2f || screenRect.height > Screen.height * 2f)
+            {
+                HideOutline();
+                return;
+            }
+
+            Vector2 localMin;
+            Vector2 localMax;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect, screenRect.min, null, out localMin) ||
+                !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect, screenRect.max, null, out localMax))
+            {
+                HideOutline();
+                return;
+            }
+
+            float width = Mathf.Abs(localMax.x - localMin.x) + OutlinePadding * 2f;
+            float height = Mathf.Abs(localMax.y - localMin.y) + OutlinePadding * 2f;
+
+            outlineRect.sizeDelta = new Vector2(width, height);
+            outlineRect.anchoredPosition = new Vector2(
+                (localMin.x + localMax.x) * 0.5f,
+                (localMin.y + localMax.y) * 0.5f);
+            outlineRect.gameObject.SetActive(true);
+        }
+
+        private void HideOutline()
+        {
+            if (outlineRect != null && outlineRect.gameObject.activeSelf)
+            {
+                outlineRect.gameObject.SetActive(false);
+            }
+        }
+
+        private bool TryGetScreenRect(GameObject target, out Rect screenRect)
+        {
+            screenRect = default(Rect);
+
+            RectTransform rect = target.transform as RectTransform;
+            if (rect != null)
+            {
+                rect.GetWorldCorners(uiCorners);
+
+                Canvas targetCanvas = target.GetComponentInParent<Canvas>();
+                Camera uiCamera = targetCanvas != null &&
+                                  targetCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                    ? targetCanvas.worldCamera
+                    : null;
+
+                if (uiCamera == null && targetCanvas != null &&
+                    targetCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                {
+                    uiCamera = Camera.main;
+                }
+
+                float minX = float.MaxValue;
+                float minY = float.MaxValue;
+                float maxX = float.MinValue;
+                float maxY = float.MinValue;
+
+                for (int i = 0; i < uiCorners.Length; i++)
+                {
+                    Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(uiCamera, uiCorners[i]);
+                    minX = Mathf.Min(minX, screenPoint.x);
+                    minY = Mathf.Min(minY, screenPoint.y);
+                    maxX = Mathf.Max(maxX, screenPoint.x);
+                    maxY = Mathf.Max(maxY, screenPoint.y);
+                }
+
+                screenRect = Rect.MinMaxRect(minX, minY, maxX, maxY);
+                return true;
+            }
+
+            Renderer renderer = target.GetComponentInChildren<Renderer>();
+            if (renderer != null)
+            {
+                return TryGetBoundsScreenRect(renderer.bounds, out screenRect);
+            }
+
+            Collider2D collider = target.GetComponentInChildren<Collider2D>();
+            if (collider != null)
+            {
+                return TryGetBoundsScreenRect(collider.bounds, out screenRect);
+            }
+
+            return false;
+        }
+
+        private bool TryGetBoundsScreenRect(Bounds bounds, out Rect screenRect)
+        {
+            screenRect = default(Rect);
+
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                Camera[] cameras = Camera.allCameras;
+                if (cameras.Length > 0)
+                {
+                    camera = cameras[0];
+                }
+            }
+
+            if (camera == null)
+            {
+                return false;
+            }
+
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+
+            worldCorners[0] = new Vector3(min.x, min.y, min.z);
+            worldCorners[1] = new Vector3(min.x, min.y, max.z);
+            worldCorners[2] = new Vector3(min.x, max.y, min.z);
+            worldCorners[3] = new Vector3(min.x, max.y, max.z);
+            worldCorners[4] = new Vector3(max.x, min.y, min.z);
+            worldCorners[5] = new Vector3(max.x, min.y, max.z);
+            worldCorners[6] = new Vector3(max.x, max.y, min.z);
+            worldCorners[7] = new Vector3(max.x, max.y, max.z);
+
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+
+            for (int i = 0; i < worldCorners.Length; i++)
+            {
+                Vector3 screenPoint = camera.WorldToScreenPoint(worldCorners[i]);
+                if (screenPoint.z < 0f)
+                {
+                    return false;
+                }
+
+                minX = Mathf.Min(minX, screenPoint.x);
+                minY = Mathf.Min(minY, screenPoint.y);
+                maxX = Mathf.Max(maxX, screenPoint.x);
+                maxY = Mathf.Max(maxY, screenPoint.y);
+            }
+
+            screenRect = Rect.MinMaxRect(minX, minY, maxX, maxY);
+            return true;
+        }
+
+        private Sprite CreateOutlineSprite(int size, int thickness)
+        {
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "ObjectGrabberOutline",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            Color32[] pixels = new Color32[size * size];
+            Color32 clear = new Color32(255, 255, 255, 0);
+            Color32 solid = new Color32(255, 255, 255, 255);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    bool border = x < thickness || y < thickness ||
+                                  x >= size - thickness || y >= size - thickness;
+                    pixels[y * size + x] = border ? solid : clear;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(thickness, thickness, thickness, thickness));
+            sprite.name = "ObjectGrabberOutlineSprite";
+            return sprite;
         }
 
         private Sprite CreateCircleSprite(int size)
