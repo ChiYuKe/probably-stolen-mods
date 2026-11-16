@@ -6,3 +6,9 @@ obj/
 # Visual Studio 的本地缓存
 *.suo
 *.sln.docstates
+
+# 自己反编译的游戏 API，按需生成，不入库
+.decompile/
+
+# 开发时的验证工具，跟 mod 本身无关
+NeteaseCassette/tools/
