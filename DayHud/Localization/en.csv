@@ -5,3 +5,18 @@ rent_tomorrow,RENT TMRW
 pay_in,PAY IN {0}D
 pay_today,PAY TODAY
 pay_tomorrow,PAY TMRW
+status_open,OPEN
+status_closed,CLOSED
+status_morning,MORNING
+credit_hover,Your current credit count
+config_hide_calendar,Hide the wall calendar
+config_hide_calendar_tip,When enabled the paper calendar on the wall is hidden; the day and rent are shown on the HUD dial only.
+config_hide_credit,Hide the wall credit screen
+config_hide_credit_tip,When enabled the wall credit screen is hidden; the balance is shown on the money bar under the dial.
+config_hide_outside,Hide the HUD outside the store
+config_hide_outside_tip,When enabled the HUD is hidden while scavenging or travelling outside the store, and comes back when you return.
+notify_produce,{0} produced {1} ×{2}
+notify_produce_one,{0} produced {1}
+notify_machine_default,Hydroponics
+notify_item_default,Crop
+notify_test,Notification test

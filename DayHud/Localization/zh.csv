@@ -5,3 +5,18 @@ rent_tomorrow,明天付租
 pay_in,{0}天后还款
 pay_today,今天还款
 pay_tomorrow,明天还款
+status_open,营业中
+status_closed,已打烊
+status_morning,准备中
+credit_hover,你当前的信用点余额
+config_hide_calendar,隐藏墙上的日历便签
+config_hide_calendar_tip,开启后墙上的纸质日历会收起来，天数和租金只在左上角表盘显示。
+config_hide_credit,隐藏墙上的信用点屏幕
+config_hide_credit_tip,开启后墙上的信用点屏幕会收起来，余额显示在表盘下方的货币条上。
+config_hide_outside,在其他场景隐藏 HUD
+config_hide_outside_tip,开启后离开当铺去淘荒、地图等场景时自动收起 HUD，回到店里再显示。
+notify_produce,{0} 产出 {1} ×{2}
+notify_produce_one,{0} 产出 {1}
+notify_machine_default,水培系统
+notify_item_default,作物
+notify_test,通知测试

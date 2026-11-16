@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -25,6 +26,8 @@ namespace DayHud
 
         private const string RetroTextureKey = "retro_dial";
         private const string RetroMaskKey = "retro_dial_mask";
+        private const string MoneyTextureKey = "money_bar";
+        private const string MoneyMaskKey = "money_bar_mask";
 
         private static readonly string[] WeekdayKeys =
         {
@@ -48,6 +51,34 @@ namespace DayHud
             "Saturday"
         };
 
+        private sealed class HiddenObject
+        {
+            public GameObject GameObject;
+            public bool WasActive;
+        }
+
+        public enum NoticeTone
+        {
+            Info,
+            Warning,
+            Danger,
+            Muted
+        }
+
+        private sealed class NotificationItem
+        {
+            public RectTransform Rect;
+            public CanvasGroup Group;
+            public TextMeshProUGUI Text;
+            public Image Background;
+            public Color BaseColor;
+            public Action OnClick;
+            public string Message;
+            public float Age;
+            public float Duration;
+            public bool Hovered;
+        }
+
         private static Sprite fallbackSprite;
 
         private string modId;
@@ -62,6 +93,29 @@ namespace DayHud
         private TextMeshProUGUI dayText;
         private TextMeshProUGUI weekdayText;
         private TextMeshProUGUI rentText;
+        private TextMeshProUGUI statusText;
+
+        private RectTransform moneyRoot;
+        private Image moneyShadow;
+        private Image moneyHighlight;
+        private Image moneyBar;
+        private TextMeshProUGUI moneyText;
+        private float moneyWidth = RetroWidth;
+        private float moneyHeight = 56f;
+        private int shownCash = int.MinValue;
+        private bool moneyReady;
+        private bool moneyHovering;
+
+        private const int MaxNotifications = 5;
+        private const float NotificationRowHeight = 27f;
+        private const float NotificationGap = 4f;
+        private RectTransform notificationRoot;
+        private readonly List<NotificationItem> notifications = new List<NotificationItem>();
+        private bool notificationsInitialized;
+        private float nextMachinePoll;
+        private bool machineScanLogged;
+        private readonly Dictionary<int, Dictionary<int, int>> machineOutputs =
+            new Dictionary<int, Dictionary<int, int>>();
 
         private float panelWidth = RetroWidth;
         private float panelHeight = RetroWidth;
@@ -73,10 +127,19 @@ namespace DayHud
         private TMP_FontAsset noteFont;
         private FontStyles noteStyle = FontStyles.Normal;
         private bool noteFontTried;
+        private bool hideWallCalendar = true;
+        private bool calendarHidden;
+        private readonly List<HiddenObject> hiddenCalendarObjects = new List<HiddenObject>();
+        private bool hideCreditDisplay = true;
+        private bool creditHidden;
+        private readonly List<HiddenObject> hiddenCreditObjects = new List<HiddenObject>();
+        private bool hideOutsideStore = true;
         private bool rentVisible;
         private bool rentDirty = true;
         private int rentDays = -1;
         private bool rentMortgage;
+        private bool statusDirty = true;
+        private int shownStoreState = -1;
         private Coroutine punchRoutine;
 
         public void Build(string modId, ModLog log)
@@ -104,6 +167,8 @@ namespace DayHud
             raycaster.enabled = false;
 
             BuildDial();
+            BuildMoneyBar();
+            BuildNotifications();
 
             try
             {
@@ -127,6 +192,52 @@ namespace DayHud
             }
 
             log.Log(userHidden ? "天数圆盘：关" : "天数圆盘：开");
+        }
+
+        /// <summary>
+        /// 模组配置：是否把墙上的实体日历收起来。默认开。
+        /// </summary>
+        public void SetHideWallCalendar(bool hide)
+        {
+            hideWallCalendar = hide;
+
+            if (!hide && calendarHidden)
+            {
+                calendarHidden = false;
+                RestorePhysicalCalendar();
+            }
+            else if (hide && !calendarHidden && ShouldShow())
+            {
+                calendarHidden = true;
+                HidePhysicalCalendar();
+            }
+        }
+
+        /// <summary>
+        /// 模组配置：是否把墙上的信用点屏幕收起来。默认开。
+        /// </summary>
+        public void SetHideCreditDisplay(bool hide)
+        {
+            hideCreditDisplay = hide;
+
+            if (!hide && creditHidden)
+            {
+                creditHidden = false;
+                RestoreCreditDisplay();
+            }
+            else if (hide && !creditHidden && ShouldShow())
+            {
+                creditHidden = true;
+                HideCreditDisplay();
+            }
+        }
+
+        /// <summary>
+        /// 模组配置：离开店铺的其他场景（淘荒/地图等）是否隐藏 HUD。默认隐藏。
+        /// </summary>
+        public void SetHideOutsideStore(bool hide)
+        {
+            hideOutsideStore = hide;
         }
 
         private void BuildDial()
@@ -183,9 +294,783 @@ namespace DayHud
             dayText = CreateText("Day", 32f, 12f, new Color32(238, 226, 198, 255), FontStyles.Normal);
             weekdayText = CreateText("Weekday", 14f, 8f, new Color32(176, 162, 136, 255), FontStyles.Normal);
             rentText = CreateText("Rent", 11f, 8f, new Color32(130, 198, 184, 255), FontStyles.Normal);
+            statusText = CreateText("Status", 10f, 7f, new Color32(126, 200, 184, 220), FontStyles.Normal);
 
             rentVisible = false;
             LayoutText(false);
+        }
+
+        private void BuildMoneyBar()
+        {
+            GameObject rootObject = new GameObject("MoneyBar", typeof(RectTransform));
+            moneyRoot = (RectTransform)rootObject.transform;
+            moneyRoot.SetParent(transform, false);
+            moneyRoot.anchorMin = new Vector2(0f, 1f);
+            moneyRoot.anchorMax = new Vector2(0f, 1f);
+            moneyRoot.pivot = new Vector2(0.5f, 0.5f);
+            moneyRoot.sizeDelta = new Vector2(moneyWidth, moneyHeight);
+
+            moneyShadow = CreateImage(moneyRoot, "Shadow", null, new Vector2(2f, -3f),
+                new Vector2(moneyWidth, moneyHeight));
+            moneyShadow.color = new Color(0f, 0f, 0f, 0.35f);
+
+
+            moneyHighlight = CreateImage(moneyRoot, "Highlight", null, Vector2.zero,
+                new Vector2(moneyWidth + 6f, moneyHeight + 6f));
+            moneyHighlight.color = new Color32(225, 209, 156, 255);
+            moneyHighlight.gameObject.SetActive(false);
+
+            moneyBar = CreateImage(moneyRoot, "Bar", null, Vector2.zero, new Vector2(moneyWidth, moneyHeight));
+            moneyBar.color = new Color(1f, 1f, 1f, 0f);
+
+            moneyText = CreateText(moneyRoot, "Money", 22f, 10f, new Color32(24, 44, 46, 255), FontStyles.Normal);
+            LayoutMoneyText();
+            ApplyMoneyBarSprite();
+            moneyRoot.gameObject.SetActive(false);
+        }
+
+        private void ApplyMoneyBarSprite()
+        {
+            if (moneyRoot == null || moneyBar == null || moneyShadow == null)
+            {
+                return;
+            }
+
+            Texture2D texture = FindModTexture(MoneyTextureKey);
+            if (texture == null)
+            {
+                moneyReady = false;
+                moneyRoot.gameObject.SetActive(false);
+                return;
+            }
+
+            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+            sprite.name = "DayHudMoneyBar";
+
+            moneyWidth = RetroWidth;
+            moneyHeight = moneyWidth * texture.height / texture.width;
+            Vector2 size = new Vector2(moneyWidth, moneyHeight);
+
+            moneyRoot.sizeDelta = size;
+
+            moneyShadow.sprite = sprite;
+            moneyShadow.color = new Color(0f, 0f, 0f, 0.35f);
+            RectTransform shadowRect = (RectTransform)moneyShadow.transform;
+            shadowRect.sizeDelta = size;
+            shadowRect.anchoredPosition = new Vector2(2f, -3f);
+
+            Texture2D maskTexture = FindModTexture(MoneyMaskKey);
+            Sprite maskSprite = maskTexture != null
+                ? Sprite.Create(maskTexture, new Rect(0f, 0f, maskTexture.width, maskTexture.height),
+                    new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect)
+                : null;
+            if (maskSprite != null)
+            {
+                maskSprite.name = "DayHudMoneyBarMask";
+            }
+
+            moneyHighlight.sprite = maskSprite != null ? maskSprite : sprite;
+            moneyHighlight.color = new Color32(225, 209, 156, 255);
+            RectTransform highlightRect = (RectTransform)moneyHighlight.transform;
+            highlightRect.sizeDelta = size + new Vector2(6f, 6f);
+            moneyHighlight.gameObject.SetActive(false);
+
+
+            moneyBar.sprite = sprite;
+            moneyBar.color = Color.white;
+            ((RectTransform)moneyBar.transform).sizeDelta = size;
+
+            LayoutMoneyText();
+            moneyReady = true;
+            moneyRoot.gameObject.SetActive(true);
+        }
+
+        private void LayoutMoneyText()
+        {
+            if (moneyText == null)
+            {
+                return;
+            }
+
+            float width = moneyWidth;
+            float height = moneyHeight;
+            RectTransform rect = moneyText.rectTransform;
+            rect.sizeDelta = new Vector2(width * 0.64f, height * 0.44f);
+            rect.anchoredPosition = new Vector2(width * 0.083f, -height * 0.035f);
+
+            float size = Mathf.Clamp(height * 0.33f, 9f, 24f);
+            moneyText.fontSizeMax = size;
+            moneyText.fontSize = size;
+            moneyText.fontSizeMin = 9f;
+        }
+
+        private void RefreshMoney()
+        {
+            if (!moneyReady || moneyRoot == null || moneyText == null)
+            {
+                return;
+            }
+
+            if (!PlayerStore.HasInstance)
+            {
+                moneyRoot.gameObject.SetActive(false);
+                return;
+            }
+
+            PlayerStore store = PlayerStore.Instance;
+            if (store == null)
+            {
+                moneyRoot.gameObject.SetActive(false);
+                return;
+            }
+
+            int cash = store.GetCash();
+            if (cash != shownCash)
+            {
+                shownCash = cash;
+                moneyText.text = cash + "¢";
+            }
+
+            moneyRoot.gameObject.SetActive(true);
+            UpdateMoneyBarPosition();
+        }
+
+        private void UpdateMoneyBarPosition()
+        {
+            if (moneyRoot == null || dial == null)
+            {
+                return;
+            }
+
+            const float gap = -10f;
+            float gameWidth = GetGameAreaWidthInCanvasUnits();
+            bool sideBySide = gameWidth >= panelWidth + gap + moneyWidth + MarginX * 2f;
+
+            if (sideBySide)
+            {
+                // 和表盘同一条顶边，留一点余量给描边
+                float x = dial.anchoredPosition.x + panelWidth * 0.5f + gap + moneyWidth * 0.5f;
+                float y = dial.anchoredPosition.y + panelHeight * 0.5f - 4f - moneyHeight * 0.5f;
+                moneyRoot.anchoredPosition = new Vector2(x, y);
+            }
+            else
+            {
+                // 窄屏放不下就落到表盘下面，仍然左对齐
+                float x = dial.anchoredPosition.x;
+                float y = dial.anchoredPosition.y - panelHeight * 0.5f - 10f - moneyHeight * 0.5f;
+                moneyRoot.anchoredPosition = new Vector2(x, y);
+            }
+
+        }
+
+        private float GetGameAreaWidthInCanvasUnits()
+        {
+            float scale = canvas != null && canvas.scaleFactor > 0.0001f ? canvas.scaleFactor : 1f;
+            float widthPixels = LetterboxManager.GameAreaWidth > 0 ? LetterboxManager.GameAreaWidth : Screen.width;
+            return widthPixels / scale;
+        }
+
+        private void UpdateMoneyInteraction()
+        {
+            if (!moneyReady || moneyRoot == null || moneyBar == null || !moneyRoot.gameObject.activeSelf)
+            {
+                SetMoneyHovering(false);
+                return;
+            }
+
+            AdvCalendarUIManager calendar = AdvCalendarUIManager.Instance;
+            if (calendar != null && calendar.UIPanel != null && calendar.UIPanel.activeSelf)
+            {
+                SetMoneyHovering(false);
+                return;
+            }
+
+            bool over = RectTransformUtility.RectangleContainsScreenPoint(
+                moneyBar.rectTransform, (Vector2)Input.mousePosition, null);
+
+            if (over && InteractionBlocked())
+            {
+                over = false;
+            }
+
+            if (over != moneyHovering)
+            {
+                SetMoneyHovering(over);
+            }
+
+            if (over && Input.GetMouseButtonDown(0))
+            {
+                OpenCreditStatus();
+            }
+        }
+
+        private void SetMoneyHovering(bool value)
+        {
+            if (moneyHovering == value)
+            {
+                return;
+            }
+
+            moneyHovering = value;
+
+            if (moneyHighlight != null)
+            {
+                moneyHighlight.gameObject.SetActive(value);
+            }
+
+            if (value)
+            {
+                ShowMoneyTooltip();
+            }
+            else
+            {
+                HideMoneyTooltip();
+            }
+        }
+
+        private void ShowMoneyTooltip()
+        {
+            if (TooltipManager._instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string text = ModHelper.GetLocalized(modId, "credit_hover");
+                if (string.IsNullOrEmpty(text) || text == "credit_hover")
+                {
+                    bool chinese = false;
+                    try
+                    {
+                        chinese = LocHelper.GetCurrentLocaleCode().StartsWith("zh");
+                    }
+                    catch
+                    {
+                        // 忽略
+                    }
+
+                    text = chinese ? "你当前的信用点余额" : "Your current credit count";
+                }
+
+                TooltipManager._instance.SetAndShowTooltip(text, this);
+            }
+            catch (Exception e)
+            {
+                log.Warning("显示信用点提示失败：" + e.Message);
+            }
+        }
+
+        private void HideMoneyTooltip()
+        {
+            if (TooltipManager._instance != null)
+            {
+                TooltipManager._instance.HideTooltip(this);
+            }
+        }
+
+        private void OpenCreditStatus()
+        {
+            AdvCalendarUIManager calendar = AdvCalendarUIManager.Instance;
+            if (calendar == null)
+            {
+                log.Warning("当前场景没有日历界面，打不开信用点状态");
+                return;
+            }
+
+            try
+            {
+                calendar.OpenUI();
+                calendar.OnStatusButtonClicked();
+            }
+            catch (Exception e)
+            {
+                log.Error("打开信用点状态的时候崩了：" + e);
+            }
+
+            SetMoneyHovering(false);
+        }
+
+        private void BuildNotifications()
+        {
+            GameObject rootObject = new GameObject("Notifications", typeof(RectTransform));
+            notificationRoot = (RectTransform)rootObject.transform;
+            notificationRoot.SetParent(transform, false);
+            notificationRoot.anchorMin = new Vector2(0f, 1f);
+            notificationRoot.anchorMax = new Vector2(0f, 1f);
+            notificationRoot.pivot = new Vector2(0f, 1f);
+            notificationRoot.sizeDelta = new Vector2(panelWidth,
+                MaxNotifications * (NotificationRowHeight + NotificationGap) - NotificationGap);
+            notificationRoot.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 往左侧通知区推一条消息；同文会去重，最新的在最上面。
+        /// </summary>
+        public void Notify(string message, NoticeTone tone = NoticeTone.Info, float duration = 7f,
+            Action onClick = null, bool allowDuplicate = false)
+        {
+            if (string.IsNullOrEmpty(message) || notificationRoot == null)
+            {
+                return;
+            }
+
+            if (!allowDuplicate)
+            {
+                foreach (NotificationItem existing in notifications)
+                {
+                    if (existing.Message == message)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            NotificationItem item = CreateNotificationItem(message, tone, duration, onClick);
+            notifications.Insert(0, item);
+
+            while (notifications.Count > MaxNotifications)
+            {
+                RemoveNotificationAt(notifications.Count - 1);
+            }
+
+            LayoutNotifications();
+            notificationRoot.gameObject.SetActive(true);
+        }
+
+        private NotificationItem CreateNotificationItem(string message, NoticeTone tone, float duration,
+            Action onClick)
+        {
+            GameObject rowObject = new GameObject("Notice", typeof(RectTransform), typeof(CanvasGroup));
+            RectTransform rect = (RectTransform)rowObject.transform;
+            rect.SetParent(notificationRoot, false);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(panelWidth, NotificationRowHeight);
+
+            CanvasGroup group = rowObject.GetComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+            group.interactable = false;
+
+            Image border = CreateStretchImage(rect, "Border", new Color32(120, 100, 80, 80));
+            RectTransform borderRect = border.rectTransform;
+            borderRect.offsetMin = new Vector2(-1f, -1f);
+            borderRect.offsetMax = new Vector2(1f, 1f);
+
+            Image background = CreateStretchImage(rect, "BG", new Color32(31, 24, 37, 232));
+
+            Image accent = CreateStretchImage(rect, "Accent", ToneColor(tone));
+            RectTransform accentRect = accent.rectTransform;
+            accentRect.anchorMin = new Vector2(0f, 0f);
+            accentRect.anchorMax = new Vector2(0f, 1f);
+            accentRect.pivot = new Vector2(0f, 0.5f);
+            accentRect.offsetMin = new Vector2(0f, 3f);
+            accentRect.offsetMax = new Vector2(3f, -3f);
+
+            GameObject textObject = new GameObject("Text", typeof(RectTransform));
+            RectTransform textRect = (RectTransform)textObject.transform;
+            textRect.SetParent(rect, false);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(10f, 1f);
+            textRect.offsetMax = new Vector2(-18f, -1f);
+
+            TextMeshProUGUI text = textObject.AddComponent<TextMeshProUGUI>();
+            TMP_FontAsset font = noteFont != null ? noteFont : ResolveFont();
+            if (font != null)
+            {
+                text.font = font;
+            }
+
+            text.fontStyle = noteStyle;
+            text.fontSize = 11f;
+            text.enableAutoSizing = true;
+            text.fontSizeMax = 11f;
+            text.fontSizeMin = 8f;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+            text.color = new Color32(222, 210, 184, 255);
+            text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.raycastTarget = false;
+            text.text = message;
+
+            if (onClick != null)
+            {
+                GameObject chevronObject = new GameObject("Chevron", typeof(RectTransform));
+                RectTransform chevronRect = (RectTransform)chevronObject.transform;
+                chevronRect.SetParent(rect, false);
+                chevronRect.anchorMin = new Vector2(1f, 0f);
+                chevronRect.anchorMax = new Vector2(1f, 1f);
+                chevronRect.pivot = new Vector2(1f, 0.5f);
+                chevronRect.sizeDelta = new Vector2(14f, 0f);
+                chevronRect.anchoredPosition = new Vector2(-4f, 0f);
+
+                TextMeshProUGUI chevron = chevronObject.AddComponent<TextMeshProUGUI>();
+                if (font != null)
+                {
+                    chevron.font = font;
+                }
+
+                chevron.fontStyle = FontStyles.Normal;
+                chevron.fontSize = 13f;
+                chevron.enableAutoSizing = false;
+                chevron.alignment = TextAlignmentOptions.Center;
+                chevron.color = new Color32(160, 148, 126, 255);
+                chevron.raycastTarget = false;
+                chevron.text = "›";
+            }
+
+            return new NotificationItem
+            {
+                Rect = rect,
+                Group = group,
+                Text = text,
+                Background = background,
+                BaseColor = new Color32(31, 24, 37, 232),
+                OnClick = onClick,
+                Message = message,
+                Age = 0f,
+                Duration = duration
+            };
+        }
+
+        private static Image CreateStretchImage(Transform parent, string name, Color color)
+        {
+            GameObject imageObject = new GameObject(name, typeof(RectTransform));
+            RectTransform rect = (RectTransform)imageObject.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            Image image = imageObject.AddComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            image.preserveAspect = false;
+            return image;
+        }
+
+        private static Color ToneColor(NoticeTone tone)
+        {
+            switch (tone)
+            {
+                case NoticeTone.Warning:
+                    return new Color32(226, 186, 110, 255);
+                case NoticeTone.Danger:
+                    return new Color32(214, 116, 96, 255);
+                case NoticeTone.Muted:
+                    return new Color32(160, 148, 126, 255);
+                default:
+                    return new Color32(126, 200, 184, 255);
+            }
+        }
+
+        private void LayoutNotifications()
+        {
+            if (notificationRoot != null)
+            {
+                notificationRoot.sizeDelta = new Vector2(panelWidth,
+                    MaxNotifications * (NotificationRowHeight + NotificationGap) - NotificationGap);
+            }
+
+            for (int i = 0; i < notifications.Count; i++)
+            {
+                notifications[i].Rect.sizeDelta = new Vector2(panelWidth, NotificationRowHeight);
+                notifications[i].Rect.anchoredPosition =
+                    new Vector2(0f, -i * (NotificationRowHeight + NotificationGap));
+            }
+
+            if (notificationRoot != null)
+            {
+                notificationRoot.gameObject.SetActive(notifications.Count > 0);
+            }
+        }
+
+        private void RemoveNotificationAt(int index)
+        {
+            if (index < 0 || index >= notifications.Count)
+            {
+                return;
+            }
+
+            NotificationItem item = notifications[index];
+            notifications.RemoveAt(index);
+            if (item.Rect != null)
+            {
+                UnityEngine.Object.Destroy(item.Rect.gameObject);
+            }
+        }
+
+        private void ClearNotifications()
+        {
+            for (int i = notifications.Count - 1; i >= 0; i--)
+            {
+                RemoveNotificationAt(i);
+            }
+
+            notificationsInitialized = false;
+            nextMachinePoll = 0f;
+            machineScanLogged = false;
+            machineOutputs.Clear();
+        }
+
+        private void UpdateNotifications()
+        {
+            if (notificationRoot == null || dial == null)
+            {
+                return;
+            }
+
+            float x = dial.anchoredPosition.x - panelWidth * 0.5f;
+            float y = dial.anchoredPosition.y - panelHeight * 0.5f - 10f;
+            notificationRoot.anchoredPosition = new Vector2(x, y);
+
+            float dt = Time.unscaledDeltaTime;
+            Vector2 mouse = (Vector2)Input.mousePosition;
+            bool clicked = Input.GetMouseButtonDown(0);
+
+            for (int i = notifications.Count - 1; i >= 0; i--)
+            {
+                NotificationItem item = notifications[i];
+                item.Age += dt;
+
+                float fadeIn = Mathf.Clamp01(item.Age / 0.15f);
+                float fadeOut = Mathf.Clamp01((item.Duration - item.Age) / 0.4f);
+                item.Group.alpha = fadeIn * fadeOut;
+
+                bool over = item.OnClick != null &&
+                            RectTransformUtility.RectangleContainsScreenPoint(item.Rect, mouse, null);
+                if (over != item.Hovered)
+                {
+                    item.Hovered = over;
+                    if (item.Background != null)
+                    {
+                        item.Background.color = over
+                            ? new Color32(46, 36, 54, 242)
+                            : item.BaseColor;
+                    }
+                }
+
+                if (over && clicked)
+                {
+                    Action callback = item.OnClick;
+                    RemoveNotificationAt(i);
+                    try
+                    {
+                        callback?.Invoke();
+                    }
+                    catch (Exception e)
+                    {
+                        log.Warning("点击通知失败：" + e.Message);
+                    }
+
+                    continue;
+                }
+
+                if (item.Age >= item.Duration)
+                {
+                    RemoveNotificationAt(i);
+                }
+            }
+
+            LayoutNotifications();
+
+            if (!notificationsInitialized)
+            {
+                notificationsInitialized = true;
+                nextMachinePoll = Time.unscaledTime + 0.5f;
+                PollMachines(false);
+                return;
+            }
+
+            if (Time.unscaledTime >= nextMachinePoll)
+            {
+                nextMachinePoll = Time.unscaledTime + 0.5f;
+                PollMachines(true);
+            }
+        }
+
+        private void PollMachines(bool notify)
+        {
+            try
+            {
+                if (!PlayerStore.HasInstance)
+                {
+                    return;
+                }
+
+                EmporiumEntry entry = EmporiumEntry.Instance;
+                if (entry == null)
+                {
+                    return;
+                }
+
+                List<GameItem> machines = new List<GameItem>();
+                HashSet<int> seenIds = new HashSet<int>();
+                List<GameItem> allItems = entry.GetAllItems();
+                if (allItems == null)
+                {
+                    return;
+                }
+
+                foreach (GameItem item in allItems)
+                {
+                    if (item == null || !item.IsTag("HYDROPONIC_MACHINE_TAG"))
+                    {
+                        continue;
+                    }
+
+                    if (seenIds.Add(item.GetUniqueID()))
+                    {
+                        machines.Add(item);
+                    }
+                }
+
+                HashSet<int> alive = new HashSet<int>();
+                foreach (GameItem machine in machines)
+                {
+                    if (machine == null)
+                    {
+                        continue;
+                    }
+
+                    GameGridInventory output = MachineHydroponic.GetOutputSlot(machine);
+                    if (output == null || output.childItems == null)
+                    {
+                        continue;
+                    }
+
+                    Dictionary<int, GameItem> itemsById = new Dictionary<int, GameItem>();
+                    Dictionary<int, int> current = new Dictionary<int, int>();
+                    foreach (GameItem item in output.childItems)
+                    {
+                        if (item == null)
+                        {
+                            continue;
+                        }
+
+                        int itemId = item.GetUniqueID();
+                        itemsById[itemId] = item;
+                        current[itemId] = item.unitCount;
+                    }
+
+                    int machineId = machine.GetUniqueID();
+                    alive.Add(machineId);
+
+                    if (notify && machineOutputs.TryGetValue(machineId, out Dictionary<int, int> previous))
+                    {
+                        foreach (KeyValuePair<int, int> pair in current)
+                        {
+                            int oldUnits = previous.TryGetValue(pair.Key, out int value) ? value : 0;
+                            int delta = pair.Value - oldUnits;
+                            if (delta > 0 && itemsById.TryGetValue(pair.Key, out GameItem produced))
+                            {
+                                OnMachineProduced(machine, produced, delta);
+                            }
+                        }
+                    }
+
+                    machineOutputs[machineId] = current;
+                }
+
+                List<int> stale = new List<int>();
+                foreach (int machineId in machineOutputs.Keys)
+                {
+                    if (!alive.Contains(machineId))
+                    {
+                        stale.Add(machineId);
+                    }
+                }
+
+                foreach (int machineId in stale)
+                {
+                    machineOutputs.Remove(machineId);
+                }
+
+                if (!machineScanLogged)
+                {
+                    machineScanLogged = true;
+                    log.Log("通知区监听水培机 " + machines.Count + " 台");
+                }
+            }
+            catch (Exception e)
+            {
+                log.Warning("扫描水培产出失败：" + e.Message);
+            }
+        }
+
+        private void OnMachineProduced(GameItem machine, GameItem item, int count)
+        {
+            string machineName = machine != null && !string.IsNullOrEmpty(machine.name)
+                ? machine.name
+                : Loc("notify_machine_default", "水培系统", "Hydroponics");
+            string itemName = item != null && !string.IsNullOrEmpty(item.name)
+                ? item.name
+                : Loc("notify_item_default", "作物", "Crop");
+
+            string text = count > 1
+                ? Loc("notify_produce", "{0} 产出 {1} ×{2}", "{0} produced {1} ×{2}",
+                    machineName, itemName, count)
+                : Loc("notify_produce_one", "{0} 产出 {1}", "{0} produced {1}",
+                    machineName, itemName);
+
+            GameItem target = machine;
+            Notify(text, NoticeTone.Info, 10f, () => FocusGameItem(target), true);
+        }
+
+        /// <summary>打开并居中一个带 contentWindow 的物品/机器窗口。</summary>
+        public bool FocusGameItem(GameItem machine)
+        {
+            if (machine == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (machine.contentWindow != null)
+                {
+                    machine.contentWindow.Show();
+                    machine.contentWindow.Center();
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                log.Warning("聚焦物品窗口失败：" + e.Message);
+            }
+
+            return false;
+        }
+
+        private string Loc(string key, string fallbackZh, string fallbackEn, params object[] args)
+        {
+            string text = args.Length > 0
+                ? ModHelper.GetLocalized(modId, key, args)
+                : ModHelper.GetLocalized(modId, key);
+
+            if (string.IsNullOrEmpty(text) || text == key)
+            {
+                text = IsChineseLocale() ? fallbackZh : fallbackEn;
+            }
+
+            return args.Length > 0 ? string.Format(text, args) : text;
+        }
+
+        private static bool IsChineseLocale()
+        {
+            try
+            {
+                return LocHelper.GetCurrentLocaleCode().StartsWith("zh");
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void Update()
@@ -209,7 +1094,22 @@ namespace DayHud
             if (!visible)
             {
                 SetHovering(false);
+                SetMoneyHovering(false);
+                ClearNotifications();
                 noteFontTried = false;
+
+                if (calendarHidden)
+                {
+                    calendarHidden = false;
+                    RestorePhysicalCalendar();
+                }
+
+                if (creditHidden)
+                {
+                    creditHidden = false;
+                    RestoreCreditDisplay();
+                }
+
                 return;
             }
 
@@ -219,17 +1119,64 @@ namespace DayHud
                 AdoptNoteFont();
             }
 
+            if (hideWallCalendar)
+            {
+                if (!calendarHidden)
+                {
+                    calendarHidden = true;
+                    HidePhysicalCalendar();
+                }
+            }
+            else if (calendarHidden)
+            {
+                calendarHidden = false;
+                RestorePhysicalCalendar();
+            }
+
+            if (hideCreditDisplay)
+            {
+                if (!creditHidden)
+                {
+                    creditHidden = true;
+                    HideCreditDisplay();
+                }
+            }
+            else if (creditHidden)
+            {
+                creditHidden = false;
+                RestoreCreditDisplay();
+            }
+
+            if (calendarHidden)
+            {
+                KeepObjectsHidden(hiddenCalendarObjects);
+            }
+
+            if (creditHidden)
+            {
+                KeepObjectsHidden(hiddenCreditObjects);
+            }
+
             if (!retroApplied)
             {
                 // 资源加载事件没赶上的话，这里兜一下
                 ApplyRetroBackground();
             }
 
+            if (!moneyReady)
+            {
+                ApplyMoneyBarSprite();
+            }
+
             KeepInsideGameArea();
             EnsureFont();
             RefreshRent();
+            RefreshStatus();
+            RefreshMoney();
+            UpdateMoneyInteraction();
 
             int day = Mathf.Max(1, StoreStation.GetDayCounter());
+            UpdateNotifications();
             if (day == shownDay)
             {
                 return;
@@ -242,7 +1189,12 @@ namespace DayHud
 
         private void OnDestroy()
         {
+            DayHudApi.Detach(this);
             SetHovering(false);
+            ClearNotifications();
+            SetMoneyHovering(false);
+            RestorePhysicalCalendar();
+            RestoreCreditDisplay();
             ModHook.OnModAssetsLoaded -= OnModAssetsLoaded;
 
             try
@@ -375,19 +1327,23 @@ namespace DayHud
 
             // 贴图是后加载的：资源到位后换掉临时圆盘，再刷一遍文字
             ApplyRetroBackground();
+            ApplyMoneyBarSprite();
             shownDay = int.MinValue;
             rentDirty = true;
+            statusDirty = true;
         }
 
         private void OnLocaleChanged(Locale locale)
         {
             noteFont = null;
-            noteFontTried = false;
+            // 便签被藏起来后 TMPLocalizer 不会跟着换字体，这时直接用游戏的当前语言字体
+            noteFontTried = calendarHidden;
 
             ApplyFont(ResolveFont());
             ApplyStyle(FontStyles.Normal);
             shownDay = int.MinValue;
             rentDirty = true;
+            statusDirty = true;
 
             if (hovering)
             {
@@ -442,29 +1398,37 @@ namespace DayHud
             float width = panelWidth;
             float height = panelHeight;
 
-            float daySize = Mathf.Clamp(width * 0.168f, 14f, 40f);
+            float statusSize = Mathf.Clamp(width * 0.058f, 7f, 16f);
+            statusText.fontSizeMax = statusSize;
+            statusText.fontSize = statusSize;
+            statusText.fontSizeMin = 7f;
+            RectTransform statusRect = statusText.rectTransform;
+            statusRect.sizeDelta = new Vector2(width * 0.5f, height * 0.09f);
+            statusRect.anchoredPosition = new Vector2(0f, height * 0.295f);
+
+            float daySize = Mathf.Clamp(width * 0.19f, 14f, 44f);
             dayText.fontSizeMax = daySize;
             dayText.fontSize = daySize;
             dayText.fontSizeMin = 12f;
             RectTransform dayRect = dayText.rectTransform;
-            dayRect.sizeDelta = new Vector2(width * 0.66f, height * 0.27f);
-            dayRect.anchoredPosition = new Vector2(0f, height * (showRent ? 0.045f : 0.022f));
+            dayRect.sizeDelta = new Vector2(width * 0.68f, height * 0.28f);
+            dayRect.anchoredPosition = new Vector2(0f, height * (showRent ? 0.097f : 0.05f));
 
-            float weekSize = Mathf.Clamp(width * 0.063f, 9f, 18f);
+            float weekSize = Mathf.Clamp(width * 0.074f, 9f, 20f);
             weekdayText.fontSizeMax = weekSize;
             weekdayText.fontSize = weekSize;
             weekdayText.fontSizeMin = 8f;
             RectTransform weekRect = weekdayText.rectTransform;
-            weekRect.sizeDelta = new Vector2(width * 0.54f, height * 0.13f);
-            weekRect.anchoredPosition = new Vector2(0f, -height * (showRent ? 0.12f : 0.17f));
+            weekRect.sizeDelta = new Vector2(width * 0.54f, height * 0.14f);
+            weekRect.anchoredPosition = new Vector2(0f, -height * (showRent ? 0.086f : 0.13f));
 
-            float rentSize = Mathf.Clamp(width * 0.063f, 8f, 16f);
+            float rentSize = Mathf.Clamp(width * 0.058f, 8f, 18f);
             rentText.fontSizeMax = rentSize;
             rentText.fontSize = rentSize;
             rentText.fontSizeMin = 8f;
             RectTransform rentRect = rentText.rectTransform;
-            rentRect.sizeDelta = new Vector2(width * 0.42f, height * 0.1f);
-            rentRect.anchoredPosition = new Vector2(0f, -height * 0.27f);
+            rentRect.sizeDelta = new Vector2(width * 0.58f, height * 0.1f);
+            rentRect.anchoredPosition = new Vector2(0f, -height * 0.237f);
             rentText.gameObject.SetActive(showRent);
         }
 
@@ -511,7 +1475,9 @@ namespace DayHud
             }
 
             bool show = !store.IsPropertyPaid;
-            int days = show ? store.GetRentDayCounter() : -1;
+            // 用显示出来的天数算租金，避免开局 dayCounter=0 时显示“第1天”却提示“今天付租”
+            int displayDay = Mathf.Max(1, StoreStation.GetDayCounter());
+            int days = show ? (7 - displayDay % 7) % 7 : -1;
             bool mortgage = show && store.isPayingMortgage;
 
             if (!rentDirty && show == rentVisible && days == rentDays && mortgage == rentMortgage)
@@ -530,10 +1496,97 @@ namespace DayHud
             }
 
             SetRentVisible(true);
-            rentText.text = FormatRent(days, mortgage);
+            int amount = mortgage ? store.mortgageWeeklyPayment : store.GetRentValue();
+            rentText.text = FormatRent(days, mortgage) + " " + amount + "¢";
             rentText.color = days <= 1
                 ? new Color32(232, 190, 112, 255)
                 : new Color32(142, 208, 192, 255);
+        }
+
+        /// <summary>
+        /// 表盘顶部补一行营业状态，顺便把空着的地方填起来。
+        /// </summary>
+        private void RefreshStatus()
+        {
+            if (statusText == null)
+            {
+                return;
+            }
+
+            if (!PlayerStore.HasInstance)
+            {
+                statusText.gameObject.SetActive(false);
+                return;
+            }
+
+            PlayerStore store = PlayerStore.Instance;
+            if (store == null)
+            {
+                statusText.gameObject.SetActive(false);
+                return;
+            }
+
+            int state = (int)store.storeState;
+            if (!statusDirty && state == shownStoreState)
+            {
+                return;
+            }
+
+            statusDirty = false;
+            shownStoreState = state;
+
+            string key;
+            Color color;
+            if (store.storeState == PlayerStore.StoreState.OPEN)
+            {
+                key = "status_open";
+                color = new Color32(126, 200, 184, 220);
+            }
+            else if (store.storeState == PlayerStore.StoreState.MORNING)
+            {
+                key = "status_morning";
+                color = new Color32(226, 186, 110, 220);
+            }
+            else
+            {
+                key = "status_closed";
+                color = new Color32(160, 148, 126, 220);
+            }
+
+            string text = ModHelper.GetLocalized(modId, key);
+            if (string.IsNullOrEmpty(text) || text == key)
+            {
+                text = DefaultStatus(store.storeState);
+            }
+
+            statusText.text = text;
+            statusText.color = color;
+            statusText.gameObject.SetActive(true);
+        }
+
+        private static string DefaultStatus(PlayerStore.StoreState state)
+        {
+            bool chinese = false;
+            try
+            {
+                chinese = LocHelper.GetCurrentLocaleCode().StartsWith("zh");
+            }
+            catch
+            {
+                // 本地化还没初始化
+            }
+
+            if (state == PlayerStore.StoreState.OPEN)
+            {
+                return chinese ? "营业中" : "OPEN";
+            }
+
+            if (state == PlayerStore.StoreState.MORNING)
+            {
+                return chinese ? "准备中" : "MORNING";
+            }
+
+            return chinese ? "已打烊" : "CLOSED";
         }
 
         private void SetRentVisible(bool visible)
@@ -636,6 +1689,24 @@ namespace DayHud
             {
                 rentText.font = font;
             }
+
+            if (statusText != null)
+            {
+                statusText.font = font;
+            }
+
+            if (moneyText != null)
+            {
+                moneyText.font = font;
+            }
+
+            foreach (NotificationItem item in notifications)
+            {
+                if (item.Text != null)
+                {
+                    item.Text.font = font;
+                }
+            }
         }
 
         private void ApplyStyle(FontStyles style)
@@ -654,6 +1725,24 @@ namespace DayHud
             {
                 rentText.fontStyle = style;
             }
+
+            if (statusText != null)
+            {
+                statusText.fontStyle = style;
+            }
+
+            if (moneyText != null)
+            {
+                moneyText.fontStyle = style;
+            }
+
+            foreach (NotificationItem item in notifications)
+            {
+                if (item.Text != null)
+                {
+                    item.Text.fontStyle = style;
+                }
+            }
         }
 
         /// <summary>
@@ -663,32 +1752,255 @@ namespace DayHud
         {
             try
             {
-                foreach (StoreCalendar calendar in Resources.FindObjectsOfTypeAll<StoreCalendar>())
+                StoreCalendar calendar = FindStoreCalendar();
+                if (calendar == null || !calendar.gameObject.activeInHierarchy)
                 {
-                    if (calendar == null || calendar.gameObject == null || !calendar.gameObject.scene.IsValid())
-                    {
-                        continue;
-                    }
-
-                    TextMeshProUGUI source = calendar.dayTMP;
-                    if (source == null || source.font == null)
-                    {
-                        continue;
-                    }
-
-                    noteFont = source.font;
-                    noteStyle = source.fontStyle;
-                    ApplyFont(noteFont);
-                    ApplyStyle(noteStyle);
-                    shownDay = int.MinValue;
-                    log.Log("字体已跟日历便签统一：" + noteFont.name);
                     return;
                 }
+
+                TextMeshProUGUI source = calendar.dayTMP;
+                if (source == null || source.font == null)
+                {
+                    return;
+                }
+
+                noteFont = source.font;
+                noteStyle = source.fontStyle;
+                ApplyFont(noteFont);
+                ApplyStyle(noteStyle);
+                shownDay = int.MinValue;
+                log.Log("字体已跟日历便签统一：" + noteFont.name);
             }
             catch (Exception e)
             {
                 log.Warning("找日历便签字体失败：" + e.Message);
             }
+        }
+
+        /// <summary>
+        /// 墙上的纸质日历和 HUD 重复了，收起来只留 HUD；mod 关掉时再放回去。
+        /// </summary>
+        private void HidePhysicalCalendar()
+        {
+            try
+            {
+                StoreCalendar calendar = FindStoreCalendar();
+                if (calendar == null)
+                {
+                    return;
+                }
+
+                HideObject(calendar.gameObject, hiddenCalendarObjects);
+
+                Transform parent = calendar.transform.parent;
+                if (parent != null)
+                {
+                    HideChild(parent, "CalendarTop", hiddenCalendarObjects);
+                    HideChild(parent, "CalendarGlow", hiddenCalendarObjects);
+                }
+
+                if (calendar.dayTMP != null)
+                {
+                    HideObject(calendar.dayTMP.gameObject, hiddenCalendarObjects);
+                }
+
+                // 组件引用偶尔会指到别的对象，按场景里的实际名字再兜一遍
+                HideAllSceneObjects("Calendar", hiddenCalendarObjects);
+                HideAllSceneObjects("CalendarTop", hiddenCalendarObjects);
+                HideAllSceneObjects("CalendarGlow", hiddenCalendarObjects);
+                HideAllSceneObjects("rentTMP", hiddenCalendarObjects);
+
+                log.Log("墙上日历已隐藏 " + hiddenCalendarObjects.Count + " 个对象：" +
+                        NamesOf(hiddenCalendarObjects));
+            }
+            catch (Exception e)
+            {
+                log.Warning("隐藏墙上日历失败：" + e.Message);
+            }
+        }
+
+        /// <summary>
+        /// 墙上的信用点屏幕也由 HUD 接管，默认收起。
+        /// </summary>
+        private void HideCreditDisplay()
+        {
+            try
+            {
+                GameObject interactable = FindSceneObject("--Interactable");
+                if (interactable != null)
+                {
+                    HideChild(interactable.transform, "CreditDisplay", hiddenCreditObjects);
+                    HideChild(interactable.transform, "CreditDisplayGlow", hiddenCreditObjects);
+                }
+
+                GameObject worldCanvas = FindSceneObject("CanvasWorldStoreInteract");
+                if (worldCanvas != null)
+                {
+                    HideChild(worldCanvas.transform, "moneyTeshMeshPro", hiddenCreditObjects);
+                }
+
+                HideAllSceneObjects("CreditDisplay", hiddenCreditObjects);
+                HideAllSceneObjects("CreditDisplayGlow", hiddenCreditObjects);
+                HideAllSceneObjects("moneyTeshMeshPro", hiddenCreditObjects);
+
+                if (hiddenCreditObjects.Count > 0)
+                {
+                    log.Log("墙上信用点屏幕已隐藏 " + hiddenCreditObjects.Count + " 个对象：" +
+                            NamesOf(hiddenCreditObjects));
+                }
+            }
+            catch (Exception e)
+            {
+                log.Warning("隐藏信用点屏幕失败：" + e.Message);
+            }
+        }
+
+        private void HideChild(Transform parent, string childName, List<HiddenObject> hidden)
+        {
+            Transform child = parent.Find(childName);
+            if (child != null)
+            {
+                HideObject(child.gameObject, hidden);
+            }
+        }
+
+        private void HideSceneObject(string objectName, List<HiddenObject> hidden)
+        {
+            GameObject target = FindSceneObject(objectName);
+            if (target != null)
+            {
+                HideObject(target, hidden);
+            }
+        }
+
+        private void HideAllSceneObjects(string objectName, List<HiddenObject> hidden)
+        {
+            foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+            {
+                if (go != null && go.name == objectName && go.scene.IsValid())
+                {
+                    HideObject(go, hidden);
+                }
+            }
+        }
+
+        private static string NamesOf(List<HiddenObject> objects)
+        {
+            List<string> names = new List<string>();
+            foreach (HiddenObject entry in objects)
+            {
+                if (entry.GameObject != null)
+                {
+                    names.Add(entry.GameObject.name);
+                }
+            }
+
+            return string.Join(",", names.ToArray());
+        }
+
+        private void HideSceneChild(string parentName, string childName, List<HiddenObject> hidden)
+        {
+            GameObject parent = FindSceneObject(parentName);
+            if (parent != null)
+            {
+                HideChild(parent.transform, childName, hidden);
+            }
+        }
+
+        private void HideObject(GameObject target, List<HiddenObject> hidden)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            foreach (HiddenObject entry in hidden)
+            {
+                if (entry.GameObject == target)
+                {
+                    if (target.activeSelf)
+                    {
+                        target.SetActive(false);
+                    }
+
+                    return;
+                }
+            }
+
+            hidden.Add(new HiddenObject
+            {
+                GameObject = target,
+                WasActive = target.activeSelf
+            });
+
+            if (target.activeSelf)
+            {
+                target.SetActive(false);
+            }
+        }
+
+        private void RestorePhysicalCalendar()
+        {
+            RestoreObjects(hiddenCalendarObjects);
+        }
+
+        private void RestoreCreditDisplay()
+        {
+            RestoreObjects(hiddenCreditObjects);
+        }
+
+        private void RestoreObjects(List<HiddenObject> hidden)
+        {
+            foreach (HiddenObject entry in hidden)
+            {
+                GameObject target = entry.GameObject;
+                if (target != null && entry.WasActive && !target.activeSelf)
+                {
+                    target.SetActive(true);
+                }
+            }
+
+            hidden.Clear();
+        }
+
+        private static void KeepObjectsHidden(List<HiddenObject> hidden)
+        {
+            foreach (HiddenObject entry in hidden)
+            {
+                GameObject target = entry.GameObject;
+                if (target != null && target.activeSelf)
+                {
+                    target.SetActive(false);
+                }
+            }
+        }
+
+        private static GameObject FindSceneObject(string objectName)
+        {
+            foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+            {
+                if (go != null && go.name == objectName && go.scene.IsValid())
+                {
+                    return go;
+                }
+            }
+
+            return null;
+        }
+
+        private static StoreCalendar FindStoreCalendar()
+        {
+            foreach (StoreCalendar calendar in Resources.FindObjectsOfTypeAll<StoreCalendar>())
+            {
+                if (calendar == null || calendar.gameObject == null || !calendar.gameObject.scene.IsValid())
+                {
+                    continue;
+                }
+
+                return calendar;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -808,9 +2120,15 @@ namespace DayHud
 
         private TextMeshProUGUI CreateText(string name, float maxSize, float minSize, Color color, FontStyles style)
         {
+            return CreateText(dial, name, maxSize, minSize, color, style);
+        }
+
+        private TextMeshProUGUI CreateText(Transform parent, string name, float maxSize, float minSize, Color color,
+            FontStyles style)
+        {
             GameObject textObject = new GameObject(name, typeof(RectTransform));
             RectTransform rect = (RectTransform)textObject.transform;
-            rect.SetParent(dial, false);
+            rect.SetParent(parent, false);
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
@@ -866,9 +2184,15 @@ namespace DayHud
             float leftInset = LetterboxManager.GameAreaX;
             float topInset = Screen.height - (LetterboxManager.GameAreaY + LetterboxManager.GameAreaHeight);
 
+            float halfWidth = panelWidth * 0.5f * scale;
+            float halfHeight = panelHeight * 0.5f * scale;
+            float marginX = MarginX * scale;
+            float marginY = MarginY * scale;
+
+            // 边距和面板一样按 Canvas 单位缩放，再统一换算成像素
             Vector2 target = new Vector2(
-                (leftInset + MarginX + panelWidth * 0.5f) / scale,
-                -(topInset + MarginY + panelHeight * 0.5f) / scale);
+                (leftInset + marginX + halfWidth) / scale,
+                -(topInset + marginY + halfHeight) / scale);
 
             if ((dial.anchoredPosition - target).sqrMagnitude > 0.04f)
             {
@@ -876,7 +2200,7 @@ namespace DayHud
             }
         }
 
-        private static bool ShouldShow()
+        private bool ShouldShow()
         {
             NewGameData newGameData = NewGameData.Instance;
             if (newGameData != null && newGameData.isInMainMenu)
@@ -886,7 +2210,36 @@ namespace DayHud
 
             // PlayerStore 只在对局里存在；用它当"这局已经起来了"的判据，
             // 免得在买/读档前就去碰 StoreStation 把单例提前建出来。
-            return PlayerStore.HasInstance;
+            if (!PlayerStore.HasInstance)
+            {
+                return false;
+            }
+
+            return !hideOutsideStore || !IsOutsideStore();
+        }
+
+        private static bool IsOutsideStore()
+        {
+            try
+            {
+                MapUIManager map = MapUIManager.Instance;
+                if (map != null && map.IsOutside)
+                {
+                    return true;
+                }
+
+                // 商店 UI 都不在场景里了，说明不是店里
+                if (StoreUIManager.Instance == null)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // 场景切换的空档，按店里处理，下一帧会再判断
+            }
+
+            return false;
         }
 
         private void Punch()
@@ -1053,3 +2406,10 @@ namespace DayHud
         }
     }
 }
+
+
+
+
+
+
+

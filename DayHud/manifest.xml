@@ -4,7 +4,7 @@
   <Name>天数圆盘</Name>
   <Author>Liukeyu</Author>
   <ModVersion>0.1</ModVersion>
-  <Description>在左上角加一个圆形天数面板，显示天数、星期和租金倒计时；悬停亮边，点击打开日历。</Description>
+  <Description>在左上角加一个圆形天数面板：营业状态、天数、星期、租金倒计时和金额；右侧接一条信用点货币条，悬停提示余额，点击打开状态页。表盘下方是通知列表，显示水培产出等事件，点击通知可聚焦对应机器。默认隐藏墙上的纸质日历和信用点屏幕，离开店铺的其他场景也会自动隐藏 HUD。</Description>
   <GameVersions>
     <Version>0.46</Version>
   </GameVersions>
