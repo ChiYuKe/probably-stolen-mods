@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>inventory_search</ID>
+  <Name>仓库检索</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>给店里所有存货加一个搜索窗口：按名称或标识搜索仓库、前后柜台、展示柜、暗格、文件柜、机器内部等容器，按范围/价值/数量/位置排序，可只看违禁品和赃物；点一条结果会打开对应容器并高亮那件物品。窗口里的「归类」按类别把本店货物挪到暗格/展示柜/前柜/后柜/仓库，执行前有预览、执行后可撤销。默认 F3 打开，可在模组设置里改键。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>InventorySearch.dll</Assembly>
+  </Assemblies>
+  <Capabilities />
+</Manifest>

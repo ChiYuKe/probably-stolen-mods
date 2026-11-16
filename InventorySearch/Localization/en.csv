@@ -1,0 +1,79 @@
+window_title,Inventory Search
+search_placeholder,Name or identifier, space-separated
+refresh,Refresh
+clear,Clear
+area_all,All
+area_warehouse,Warehouse
+area_front,Front counter
+area_back,Back counter
+area_showcase,Showcase
+area_hidden,Hidden stash
+area_docs,Filing cabinet
+area_trash,Trash
+area_afterhour,Night bag
+area_hireling,Hireling bag
+area_bazaar,Night bazaar
+area_vending,Vending machine
+area_fountain,Drink fountain
+sort_name,Name
+sort_value,Value
+sort_count,Count
+sort_location,Location
+only_contraband,Contraband only
+status_count,{0} items · {1} matches
+status_truncated,(showing first {0}, narrow the search)
+empty,Nothing matches.
+no_store,Not in the store: load a save first.
+hint,Click a result to open its container and highlight it; Tidy moves goods to their matching containers.
+value_short,value {0}
+tooltip_click,Click to locate
+item_gone,That item moved. Try refreshing.
+no_window,It is inside "{0}", which has no window to open.
+outside,Cannot open store containers while you are away from the store.
+located,Located: {0} ({1})
+config_hotkey,Inventory search hotkey
+config_hotkey_tip,F3 by default. Choose "None" to only use the F9 debug panel entry.
+config_close_on_focus,Close the window after locating
+config_close_on_focus_tip,When enabled the search window closes after a result is clicked, so it does not cover the highlighted item.
+debug_open,Inventory search
+debug_scan,Inventory search: scan stats
+classify_button,Tidy
+classify_debug,Tidy by category
+classify_title,Tidy by category
+classify_scope_warehouse,Warehouse only
+classify_scope_all,All containers
+classify_rule_contraband,Contraband / stolen → hidden stash
+classify_rule_weapon,Weapons / ammo / armor → showcase
+classify_rule_luxury,Luxury → showcase
+classify_rule_consumable,Food / drink / medicine → front counter
+classify_rule_household,Household / lottery → front counter
+classify_rule_supply,Materials / tools / parts / seeds → back counter
+classify_rule_document,Documents / other → warehouse
+classify_note,Only owned, unpinned top-level items are moved; machines, bags, boxes and items that do not fit stay where they are.
+classify_planned,Click Apply to move them; you can undo afterwards.
+classify_none,Nothing to move.
+classify_skipped,{0} to move, {1} skipped.
+classify_count_line,{0} → {1}: {2}
+classify_execute,Apply
+classify_undo,Undo last
+classify_refresh,Refresh
+classify_close,Close
+classify_moved,Moved {0}, {1} did not fit.
+classify_undo_done,Restored {0}, {1} did not fit.
+classify_no_undo,Nothing to undo.
+classify_no_store,Go back to the store first.
+classify_dragging,Let go of the mouse first.
+classify_error,Something went wrong; check the log.
+classify_group_contraband,Contraband / stolen
+classify_group_weapon,Weapons / ammo / armor
+classify_group_luxury,Luxury
+classify_group_consumable,Food / drink / medicine
+classify_group_household,Household / lottery
+classify_group_supply,Materials / tools / parts
+classify_group_document,Documents
+classify_group_other,Other
+classify_target_hidden,hidden stash
+classify_target_showcase,showcase
+classify_target_front,front counter
+classify_target_back,back counter
+classify_target_warehouse,warehouse

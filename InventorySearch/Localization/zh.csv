@@ -1,0 +1,79 @@
+window_title,仓库检索
+search_placeholder,输入名称或标识，空格分隔多个关键词
+refresh,刷新
+clear,清空
+area_all,全部
+area_warehouse,仓库
+area_front,前柜
+area_back,后柜
+area_showcase,展示柜
+area_hidden,暗格
+area_docs,文件柜
+area_trash,垃圾桶
+area_afterhour,夜间背包
+area_hireling,雇员背包
+area_bazaar,夜市摊位
+area_vending,售货机
+area_fountain,饮料机
+sort_name,名称
+sort_value,价值
+sort_count,数量
+sort_location,位置
+only_contraband,只看违禁 / 赃物
+status_count,共 {0} 件 · 匹配 {1} 条
+status_truncated,（只显示前 {0} 条，再输点关键词缩小范围）
+empty,没有匹配的物品。
+no_store,当前不在当铺里：先载入一个存档，再回来检索。
+hint,点一条结果：打开对应容器并高亮那件物品；「归类」按类别把货挪到对应柜子。
+value_short,估值 {0}
+tooltip_click,点击定位
+item_gone,那件物品已经不在原位了，刷新一下试试。
+no_window,东西在「{0}」里，但这个容器没有可打开的窗口。
+outside,在店外没法定位店里的容器，回店里再试。
+located,已定位：{0}（{1}）
+config_hotkey,打开仓库检索的快捷键
+config_hotkey_tip,默认 F3。F3 不占用游戏原版按键；改成「None」就只用 F9 调试面板里的入口。
+config_close_on_focus,定位后收起检索窗口
+config_close_on_focus_tip,开启后点结果会立刻关掉检索窗口，免得挡住刚打开的高亮位置；想连续找东西就关掉。
+debug_open,仓库检索
+debug_scan,仓库检索：扫描统计
+classify_button,归类
+classify_debug,归类整理
+classify_title,归类整理
+classify_scope_warehouse,只整理仓库（新货入柜）
+classify_scope_all,整理全部容器（含柜台、展示柜、暗格）
+classify_rule_contraband,违禁 / 赃物 → 暗格
+classify_rule_weapon,武器 / 弹药 / 护甲 → 展示柜
+classify_rule_luxury,奢侈品 → 展示柜
+classify_rule_consumable,食物 / 饮料 / 药品 → 前柜
+classify_rule_household,家居 / 彩票 → 前柜
+classify_rule_supply,材料 / 工具 / 零件 / 种子 → 后柜
+classify_rule_document,文件 / 其他 → 仓库
+classify_note,只动本店所有、没固定、能拿起来的顶层物品；机器、背包、盒子和放不下的都会留在原地。
+classify_planned,先点「执行」，全部移动会立刻生效；不满意可以撤销。
+classify_none,没有需要移动的物品。
+classify_skipped,预计移动 {0} 件，{1} 件跳过。
+classify_count_line,{0} → {1}：{2}
+classify_execute,执行
+classify_undo,撤销上一次
+classify_refresh,刷新预览
+classify_close,关闭
+classify_moved,已移动 {0} 件，{1} 件没放下。
+classify_undo_done,已撤回 {0} 件，{1} 件没放下。
+classify_no_undo,没有可撤销的整理。
+classify_no_store,回当铺里再整理。
+classify_dragging,先松开鼠标再整理。
+classify_error,整理时出错了，看日志。
+classify_group_contraband,违禁 / 赃物
+classify_group_weapon,武器 / 弹药 / 护甲
+classify_group_luxury,奢侈品
+classify_group_consumable,食物 / 饮料 / 药品
+classify_group_household,家居 / 彩票
+classify_group_supply,材料 / 工具 / 零件
+classify_group_document,文件
+classify_group_other,其他
+classify_target_hidden,暗格
+classify_target_showcase,展示柜
+classify_target_front,前柜
+classify_target_back,后柜
+classify_target_warehouse,仓库
