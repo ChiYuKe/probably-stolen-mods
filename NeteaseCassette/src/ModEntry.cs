@@ -12,6 +12,11 @@ namespace NeteaseCassette
         // 自己 new 出来的没有，游戏里到处 identifier.Equals，会空引用。
         public const string TapeItemId = "netease_tape";
 
+        public const string CaseItemId = "netease_tape_case";
+
+        // 打过这个标签就说明这个存档已经送过收纳盒了
+        private const string CaseSeededTag = "NETEASE_CASE_SEEDED_TAG_V2";
+
         // 卡带图数量，Textures/Items 下的 tape_01 ~ tape_64
         internal const int TapeSpriteCount = 64;
 
@@ -43,7 +48,9 @@ namespace NeteaseCassette
 
             ModHook.OnGameLoadedLate += OnGameLoaded;
             ModHook.OnModItemDirectoryInit += RegisterItems;
+            ModHook.OnCreateTooltipLate += AddCaseTooltip;
             ModHelper.AddDebugFunction(ModId, "Modding", "网易云磁带机", CloudWindow.Open);
+            ModHelper.AddDebugFunction(ModId, "Modding", "给一个磁盘收纳盒", SpawnCase);
 
             Log.Log("网易云客户端就绪，登录状态：" + (Client.IsLoggedIn ? (Client.Nickname ?? "已登录") : "未登录"));
         }
@@ -52,12 +59,14 @@ namespace NeteaseCassette
         {
             ModHook.OnGameLoadedLate -= OnGameLoaded;
             ModHook.OnModItemDirectoryInit -= RegisterItems;
+            ModHook.OnCreateTooltipLate -= AddCaseTooltip;
             ModHelper.RemoveDebugFunctions(ModId);
 
             SaveSession();
             StreamPlayer.Shutdown();
             CloudWindow.Close();
             LyricPanel.Close();
+            CaseFrame.Stop();
             Lyrics.Shutdown();
             Client = null;
             Log = null;
@@ -69,6 +78,10 @@ namespace NeteaseCassette
             {
                 bool hasDeck = EmporiumEntry.Instance != null && EmporiumEntry.Instance.cassettePlayer != null;
                 Log.Log("存档载入完成，磁带机：" + (hasDeck ? "在" : "不在") + "，云登录：" + (Client != null && Client.IsLoggedIn ? "是" : "否"));
+
+                Lyrics.RestoreIfEnabled();
+                SeedCaseOnce();
+                CaseFrame.Start();
             }
             catch (Exception e)
             {
@@ -79,7 +92,149 @@ namespace NeteaseCassette
         private static void RegisterItems(ModItemDirectory dir)
         {
             dir.Add(TapeItemId, CreateTapeTemplate);
-            Log?.Log("云磁带物品已注册：" + TapeItemId);
+            dir.Add(CaseItemId, CreateCaseTemplate);
+            Log?.Log("云磁带物品已注册：" + TapeItemId + "、" + CaseItemId);
+        }
+
+        // 磁盘收纳盒：6×2 格的容器，只收磁带，12×10 的格子刚好放 30 盘（每盘占 2×2）
+        private static GameItem CreateCaseTemplate()
+        {
+            var item = ItemDirectory.CreateEmptyItem(CaseItemId);
+            item.name = "磁盘收纳盒";
+            item.shortDescription = "横向两格高，塞得下 30 盘磁带。";
+            item.SetSpriteAndShapeFromMod(ModId, "tape_case");
+            if (item.shape == null || item.shape.width != 6 || item.shape.height != 2)
+            {
+                Log?.Warning("收纳盒贴图尺寸不对，应该是 96x32（6×2 格）");
+            }
+
+            (PixelWindow window, GameInventory inventory) = DirectoryUtils.CreateInventoryWindow(12, 10);
+            ContainerHelper.AllowOnlyTaggedItem(inventory, CassetteHelper.CASSETTE_TAG);
+            item.SetContentWindow(window);
+
+            item.EnableManufacturer("alison");
+            // 0 价值：盒子别被当成货卖掉，里面还有磁带
+            item.unitValue = 0L;
+            item.unitBaseValue = 0L;
+            item.lateUnitValue = 0L;
+            item.backupUnitValue = 0L;
+            return item;
+        }
+
+        // 每个存档第一次载入时，往磁带机的储藏格塞一个收纳盒
+        private static void SeedCaseOnce()
+        {
+            var machine = EmporiumEntry.Instance != null ? EmporiumEntry.Instance.cassettePlayer : null;
+            if (machine == null) return;
+            if (machine.IsTag(CaseSeededTag)) return;
+
+            machine.EnableTag(CaseSeededTag);
+
+            var storage = MachineHelper.GetBodyStorage(machine, 0) as GameInventory;
+            if (storage == null) return;
+
+            var caseItem = ModHelper.SpawnItem(CaseItemId);
+            if (caseItem == null)
+            {
+                Log?.Warning("生成收纳盒失败");
+                return;
+            }
+
+            ModHelper.SetItemOwnerShip(caseItem, true);
+
+            int sw = caseItem.shape != null ? caseItem.shape.width : -1;
+            int sh = caseItem.shape != null ? caseItem.shape.height : -1;
+            var grid = storage as GameGridInventory;
+            int iw = grid != null && grid.inventoryShape != null ? grid.inventoryShape.width : -1;
+            int ih = grid != null && grid.inventoryShape != null ? grid.inventoryShape.height : -1;
+            bool may = storage.MayHaveValidInventorySlot(caseItem);
+            bool hasSlot = storage.TryFindOneValidInventorySlot(caseItem) != null;
+            Log?.Log("收纳盒 " + sw + "x" + sh + "，储藏格 " + iw + "x" + ih + "，may=" + may + "，slot=" + hasSlot + "，格子里已有 " + storage.childItems.Count + " 件");
+
+            if (!hasSlot && storage.childItems.Count == 0)
+            {
+                // 新开局的储藏格是空的，直接放进去（正常途径被某种检查挡住了）
+                storage.UncheckedAccept(caseItem);
+            }
+            else
+            {
+                GraphUtils.TryAcceptAll(storage, caseItem);
+            }
+
+            if (caseItem.parentInventory == null)
+            {
+                ModHelper.MoveItemToInventory(caseItem);
+                Log?.Log("储藏格放不下，收纳盒塞进背包了");
+            }
+            else
+            {
+                Log?.Log("开局送了一个磁盘收纳盒，放在储藏格");
+            }
+        }
+
+        // 盒子在磁带仓里、而且正在放它里面的磁带时，提示框加一行「正在播放第 N 盘」
+        private static void AddCaseTooltip(RichTextBuilder builder, GameItem item)
+        {
+            try
+            {
+                if (builder == null || item == null || item.identifier != CaseItemId) return;
+
+                int index = PlayingIndexInCase(item);
+                if (index > 0)
+                {
+                    builder.AddLine(" 正在播放第 " + index + " 盘", true, RenderHandler.ColorPalette.LightGreen);
+                }
+            }
+            catch (Exception e)
+            {
+                Log?.Warning("给收纳盒加提示失败：" + e.Message);
+            }
+        }
+
+        // 返回正在播放的是盒子里第几盘（1 起），不是就返回 0
+        private static int PlayingIndexInCase(GameItem box)
+        {
+            var machine = EmporiumEntry.Instance != null ? EmporiumEntry.Instance.cassettePlayer : null;
+            if (machine == null) return 0;
+
+            var deck = MachineCassettePlayer.GetCassetteInventory();
+            if (deck == null || box.parentInventory != deck) return 0;
+
+            int state = machine.GetTagReadonly(MachineCassettePlayer.CASETTE_PLAYER_STATE_INT).GetInt();
+            if (state != 1 && state != 2) return 0;
+
+            string trackId = machine.GetTagReadonly(MachineCassettePlayer.CURRENT_PLAYING_TRACK_ID_TAG).GetString();
+            if (string.IsNullOrEmpty(trackId)) return 0;
+
+            var inner = box.contentWindow != null ? box.contentWindow.child as GameInventory : null;
+            if (inner == null) return 0;
+
+            int index = 0;
+            foreach (var child in inner.childItems)
+            {
+                if (child == null || !child.IsTag(CassetteHelper.CASSETTE_TAG)) continue;
+                index++;
+                if (child.IsTag(CassetteHelper.CASSETTE_CONTENT) &&
+                    child.GetTagReadonly(CassetteHelper.CASSETTE_CONTENT).GetString() == trackId)
+                {
+                    return index;
+                }
+            }
+
+            return 0;
+        }
+
+        private static void SpawnCase()
+        {
+            var caseItem = ModHelper.SpawnItem(CaseItemId);
+            if (caseItem == null)
+            {
+                Log?.Warning("生成收纳盒失败");
+                return;
+            }
+            ModHelper.SetItemOwnerShip(caseItem, true);
+            ModHelper.MoveItemToInventory(caseItem);
+            Log?.Log("给了一个磁盘收纳盒");
         }
 
         // 云磁带模板。每次 SpawnItem 都跑一遍，歌名和曲目由 CloudWindow 补

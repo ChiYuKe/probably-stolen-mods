@@ -21,6 +21,8 @@ namespace NeteaseCassette
         private static int generation;
         private static UnityWebRequest current;
         private static bool clipReady;
+        private static long lastSongId;
+        private static AudioClip lastClip;
         private static int consecutiveFailures;
 
         public static void Init(NeteaseClient neteaseClient, ModLog modLog)
@@ -162,6 +164,14 @@ namespace NeteaseCassette
         {
             int gen = generation;
 
+            // 刚放完的同一首（循环、重播）直接用上次解好的，省掉重新下载那一两秒
+            if (songId == lastSongId && lastClip != null)
+            {
+                log?.Log("复用已解码的音频 " + songId);
+                yield return PlayExisting(lastClip, songId, gen);
+                yield break;
+            }
+
             string url = null;
             string urlError = null;
             yield return client.GetSongUrl(songId, u => url = u, e => urlError = e);
@@ -224,6 +234,15 @@ namespace NeteaseCassette
                 yield break;
             }
 
+            lastSongId = songId;
+            lastClip = clip;
+
+            yield return PlayExisting(clip, songId, gen);
+        }
+
+        // 把解码好的音频挂到游戏的音乐音源上，顺便确认它真的出声了
+        private static IEnumerator PlayExisting(AudioClip clip, long songId, int gen)
+        {
             AudioSource source = null;
             try
             {
@@ -314,16 +333,12 @@ namespace NeteaseCassette
 
         private static string FindCassetteTitle(GameInventory inventory, string trackId)
         {
-            if (inventory == null) return null;
-            foreach (var item in inventory.childItems)
-            {
-                if (item == null || !item.IsTag(CassetteHelper.CASSETTE_TAG) || !item.IsTag(CassetteHelper.CASSETTE_CONTENT)) continue;
-                if (item.GetTagReadonly(CassetteHelper.CASSETTE_CONTENT).GetString() != trackId) continue;
-                string name = item.name ?? "";
-                int dash = name.IndexOf(" - ", StringComparison.Ordinal);
-                return dash >= 0 ? name.Substring(dash + 3) : name;
-            }
-            return null;
+            // 磁带可能在收纳盒里，所以走递归查找
+            GameItem item = CassetteScan.Find(inventory, trackId);
+            if (item == null) return null;
+            string name = item.name ?? "";
+            int dash = name.IndexOf(" - ", StringComparison.Ordinal);
+            return dash >= 0 ? name.Substring(dash + 3) : name;
         }
 
         private static void RefreshFrames(GameItem machine)

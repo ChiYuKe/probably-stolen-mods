@@ -88,8 +88,18 @@ namespace NeteaseCassette
 
         public static void Toggle()
         {
+            Settings.Shown = !Visible;
+            SaveSettings();
+
             if (Visible) Close();
             else Open();
+        }
+
+        // 进游戏时把上次开着的歌词直接打开
+        public static void RestoreIfEnabled()
+        {
+            EnsureSettings();
+            if (settings.Shown && !Visible) Open();
         }
 
         public static void Open()
@@ -196,8 +206,8 @@ namespace NeteaseCassette
 
         public static void ResetPosition()
         {
-            Settings.PosX = 0f;
-            Settings.PosY = 200f;
+            Settings.PosX = -40f;
+            Settings.PosY = -40f;
             SaveSettings();
             needFit = true;
             ApplyPosition();
@@ -232,6 +242,15 @@ namespace NeteaseCassette
 
             settings.FontSize = Mathf.Clamp(settings.FontSize, 16f, 64f);
             settings.ColorIndex = Mathf.Clamp(settings.ColorIndex, 0, Colors.Length - 1);
+
+            // 老配置存的是「相对屏幕下方中间」的坐标，换锚点之后直接搬到右上角
+            if (settings.LayoutVersion < 1)
+            {
+                settings.LayoutVersion = 1;
+                settings.PosX = -40f;
+                settings.PosY = -40f;
+                SaveSettings();
+            }
         }
 
         private static void SaveSettings()
@@ -280,9 +299,9 @@ namespace NeteaseCassette
             var rootGo = new GameObject("lyric_root", typeof(RectTransform));
             rootGo.transform.SetParent(canvasObject.transform, false);
             root = (RectTransform)rootGo.transform;
-            root.anchorMin = new Vector2(0.5f, 0f);
-            root.anchorMax = new Vector2(0.5f, 0f);
-            root.pivot = new Vector2(0.5f, 0.5f);
+            root.anchorMin = new Vector2(1f, 1f);
+            root.anchorMax = new Vector2(1f, 1f);
+            root.pivot = new Vector2(1f, 1f);
 
             textMain = CreateText("lyric_main");
             textNext = CreateText("lyric_next");
@@ -692,15 +711,18 @@ namespace NeteaseCassette
             root.anchoredPosition = pos;
         }
 
+        // 锚点在画布右上角，所以 pos 是负数：往左、往下
         private static Vector2 ClampToCanvas(Vector2 pos, Vector2 size)
         {
             if (canvasRect == null) return pos;
-            float halfW = canvasRect.rect.width * 0.5f;
+            float width = canvasRect.rect.width;
             float height = canvasRect.rect.height;
-            float margin = 12f;
+            const float margin = 12f;
 
-            pos.x = Mathf.Clamp(pos.x, -halfW + size.x * 0.5f, halfW - size.x * 0.5f);
-            pos.y = Mathf.Clamp(pos.y, size.y * 0.5f + margin, height - size.y * 0.5f - margin);
+            float minX = size.x - width + margin;    // 左边缘不出界
+            float minY = size.y - height + margin;   // 下边缘不出界
+            pos.x = Mathf.Clamp(pos.x, minX, -margin);
+            pos.y = Mathf.Clamp(pos.y, minY, -margin);
             return pos;
         }
 

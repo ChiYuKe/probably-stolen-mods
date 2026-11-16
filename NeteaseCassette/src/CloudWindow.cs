@@ -16,9 +16,15 @@ namespace NeteaseCassette
         private const string SearchStatusId = "search_status";
         private const string PlaylistStatusId = "playlist_status";
         private const string NowPlayingId = "now_playing";
-        private const int MaxListRows = 150;
+        private const int PageSize = 100;
 
         private static CustomUIWindow window;
+        private static int searchPage;
+        private static int trackPage;
+        private static readonly Dictionary<string, Sprite> scaledSprites = new Dictionary<string, Sprite>();
+        private static MachineryButton[] modeButtons;
+        private static Sprite[] modeIcons;
+        private static Sprite[] modeDim;
         private static RectTransform searchHost;
         private static RectTransform playlistHost;
 
@@ -370,6 +376,7 @@ namespace NeteaseCassette
                 yield break;
             }
             searchSongs = result ?? new List<NcSong>();
+            searchPage = 0;
             SetText(SearchStatusId, "找到 " + searchSongs.Count + " 首，点一首就开始放。");
             FillSearch();
         }
@@ -387,17 +394,19 @@ namespace NeteaseCassette
                 }
                 else
                 {
-                    int shown = 0;
-                    foreach (var item in searchSongs)
+                    int pages = Mathf.Max(1, (searchSongs.Count + PageSize - 1) / PageSize);
+                    searchPage = Mathf.Clamp(searchPage, 0, pages - 1);
+                    int start = searchPage * PageSize;
+                    int end = Mathf.Min(searchSongs.Count, start + PageSize);
+                    for (int i = start; i < end; i++)
                     {
-                        if (shown >= MaxListRows) break;
-                        shown++;
-                        AddSongRow(builder, item, shown);
+                        AddSongRow(builder, searchSongs[i], i + 1);
                     }
-                    if (searchSongs.Count > shown)
+                    AddPager(builder, searchPage, pages, searchSongs.Count, page =>
                     {
-                        builder.AddLabel("……还有 " + (searchSongs.Count - shown) + " 首没列出来，换个关键词再搜。");
-                    }
+                        searchPage = page;
+                        FillSearch();
+                    });
                 }
                 CustomUIBuilder.RebuildLayout(searchHost);
             }
@@ -428,6 +437,7 @@ namespace NeteaseCassette
             }
             playlists = result ?? new List<NcPlaylist>();
             currentPlaylist = null;
+            trackPage = 0;
             SetText(PlaylistStatusId, "共 " + playlists.Count + " 个歌单，点进去看曲目。");
             FillPlaylists();
         }
@@ -444,20 +454,23 @@ namespace NeteaseCassette
                     builder.AddButton("返回歌单列表", () =>
                     {
                         currentPlaylist = null;
+                        trackPage = 0;
                         FillPlaylists();
                     });
                     builder.AddLabel("《" + Fit(Clean(currentPlaylist.Name), 44) + "》  " + playlistSongs.Count + " 首");
-                    int shown = 0;
-                    foreach (var item in playlistSongs)
+                    int pages = Mathf.Max(1, (playlistSongs.Count + PageSize - 1) / PageSize);
+                    trackPage = Mathf.Clamp(trackPage, 0, pages - 1);
+                    int start = trackPage * PageSize;
+                    int end = Mathf.Min(playlistSongs.Count, start + PageSize);
+                    for (int i = start; i < end; i++)
                     {
-                        if (shown >= MaxListRows) break;
-                        shown++;
-                        AddSongRow(builder, item, shown);
+                        AddSongRow(builder, playlistSongs[i], i + 1);
                     }
-                    if (playlistSongs.Count > shown)
+                    AddPager(builder, trackPage, pages, playlistSongs.Count, page =>
                     {
-                        builder.AddLabel("……还有 " + (playlistSongs.Count - shown) + " 首没列出来");
-                    }
+                        trackPage = page;
+                        FillPlaylists();
+                    });
                 }
                 else
                 {
@@ -517,6 +530,7 @@ namespace NeteaseCassette
                 yield break;
             }
             playlistSongs = result ?? new List<NcSong>();
+            trackPage = 0;
             SetText(PlaylistStatusId, "《" + playlist.Name + "》共 " + playlistSongs.Count + " 首。");
             FillPlaylists();
         }
@@ -624,16 +638,8 @@ namespace NeteaseCassette
 
         private static GameItem FindCassette(GraphNodeStorage node, string trackId)
         {
-            var inventory = node as GameInventory;
-            if (inventory == null || string.IsNullOrEmpty(trackId)) return null;
-            foreach (var item in inventory.childItems)
-            {
-                if (item == null) continue;
-                if (!item.IsTag(CassetteHelper.CASSETTE_TAG)) continue;
-                if (!item.IsTag(CassetteHelper.CASSETTE_CONTENT)) continue;
-                if (item.GetTagReadonly(CassetteHelper.CASSETTE_CONTENT).GetString() == trackId) return item;
-            }
-            return null;
+            // 磁带也可能在放进仓里的收纳盒里，一路翻下去
+            return CassetteScan.FindIn(node, trackId);
         }
 
         private static void StartTrack(GameItem machine, GameInventory deck, string trackId, int index)
@@ -690,6 +696,137 @@ namespace NeteaseCassette
 
         // 磁带机面板
 
+        // 播放模式那一行：顺序 / 循环 / 随机，当前那个亮着
+        private static MachineryStack BuildModeRow(int size)
+        {
+            string[] keys = { "mode_seq", "mode_loop", "mode_shuffle" };
+            string[] labels = { "顺序播放", "单曲循环", "随机播放" };
+            int[] values = { PlaybackMode.Sequential, PlaybackMode.Loop, PlaybackMode.Shuffle };
+
+            modeButtons = new MachineryButton[3];
+            modeIcons = new Sprite[3];
+            modeDim = new Sprite[3];
+
+            var row = new MachineryStack(false, 4);
+            for (int i = 0; i < 3; i++)
+            {
+                int index = i;
+                Sprite source = LoadModSprite(keys[i]);
+                MachineryButton button;
+                if (source != null)
+                {
+                    modeIcons[i] = ScaleSprite(keys[i], source, size, 1f);
+                    modeDim[i] = ScaleSprite(keys[i], source, size, 0.45f);
+                    button = new MachineryButton(modeIcons[i], () => { PlaybackMode.Set(values[index]); RefreshModeButtons(); }, size);
+                }
+                else
+                {
+                    button = new MachineryButton(labels[index], () => { PlaybackMode.Set(values[index]); RefreshModeButtons(); });
+                }
+                button.SetDescription(labels[index]);
+                modeButtons[i] = button;
+                row.Add(button);
+            }
+            return row;
+        }
+
+        private static void RefreshModeButtons()
+        {
+            if (modeButtons == null) return;
+
+            int mode = PlaybackMode.Mode;
+            int[] values = { PlaybackMode.Sequential, PlaybackMode.Loop, PlaybackMode.Shuffle };
+            for (int i = 0; i < modeButtons.Length; i++)
+            {
+                var button = modeButtons[i];
+                if (button == null || modeIcons == null || modeIcons[i] == null) continue;
+                button.SetIcon(values[i] == mode ? modeIcons[i] : modeDim[i]);
+            }
+        }
+
+        private static Sprite LoadModSprite(string key)
+        {
+            var mod = ModLoader.Mods.Find(m => m.Manifest.ID == ModEntry.ModId);
+            Sprite sprite;
+            if (mod != null && mod.Sprites.TryGetValue(key, out sprite)) return sprite;
+            return null;
+        }
+
+        // 有图标就用图标，没有就退回文字，免得素材漏了按钮变空白
+        private static MachineryButton MakeIconButton(string key, string fallbackText, Action callback, int size)
+        {
+            Sprite source = LoadModSprite(key);
+            if (source == null) return new MachineryButton(fallbackText, callback);
+            return new MachineryButton(ScaleSprite(key, source, size, 1f), callback, size);
+        }
+
+        // 把 32px 的图标缩到跟原版按钮一样大，顺便压暗（tint < 1）
+        private static Sprite ScaleSprite(string keyName, Sprite source, int size, float tint)
+        {
+            if (source == null || source.texture == null) return source;
+
+            // 物品贴图没有名字（全是空串），缓存必须用传进来的 key，不然所有按钮会共用一个图
+            string key = keyName + "_" + size + "_" + Mathf.RoundToInt(tint * 100f);
+            Sprite cached;
+            if (scaledSprites.TryGetValue(key, out cached)) return cached;
+
+            try
+            {
+                Rect rect = source.rect;
+                int sx = (int)rect.xMin;
+                int sy = (int)rect.yMin;
+                int sw = Mathf.Max(1, (int)rect.width);
+                int sh = Mathf.Max(1, (int)rect.height);
+
+                var colors = new Color[size * size];
+                for (int y = 0; y < size; y++)
+                {
+                    int y0 = sy + y * sh / size;
+                    int y1 = Mathf.Max(y0 + 1, sy + (y + 1) * sh / size);
+                    for (int x = 0; x < size; x++)
+                    {
+                        int x0 = sx + x * sw / size;
+                        int x1 = Mathf.Max(x0 + 1, sx + (x + 1) * sw / size);
+
+                        float r = 0f, g = 0f, b = 0f, a = 0f;
+                        int count = 0;
+                        for (int py = y0; py < y1; py++)
+                        {
+                            for (int px = x0; px < x1; px++)
+                            {
+                                Color c = source.texture.GetPixel(px, py);
+                                r += c.r * c.a;
+                                g += c.g * c.a;
+                                b += c.b * c.a;
+                                a += c.a;
+                                count++;
+                            }
+                        }
+
+                        colors[y * size + x] = (count == 0 || a <= 0.001f)
+                            ? Color.clear
+                            : new Color(r / a * tint, g / a * tint, b / a * tint, a / count);
+                    }
+                }
+
+                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+                texture.filterMode = FilterMode.Point;
+                texture.wrapMode = TextureWrapMode.Clamp;
+                texture.SetPixels(colors);
+                texture.Apply(false, false);
+
+                var sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+                sprite.name = key;
+                scaledSprites[key] = sprite;
+                return sprite;
+            }
+            catch (Exception e)
+            {
+                ModEntry.Log?.Warning("缩放按钮图标失败：" + e.Message);
+                return source;
+            }
+        }
+
         // 给原版磁带机窗口加按钮，Harmony Postfix 里调
         public static void AddCloudPanel(GameItem machine)
         {
@@ -708,29 +845,47 @@ namespace NeteaseCassette
                 return;
             }
 
-            var button = new MachineryButton("云", Open);
-            button.SetDescription("扫码登录网易云，点歌变成磁带，用这台机器播放");
-
-            var lyricButton = new MachineryButton("词", Lyrics.Toggle);
-            lyricButton.SetDescription("开关桌面歌词");
-
-            var lyricSetButton = new MachineryButton("设", LyricPanel.Open);
-            lyricSetButton.SetDescription("歌词的字号、颜色和位置");
-
             var controls = row.GetPanel("controls");
             var stack = controls != null ? controls.content as MachineryStack : null;
+
+            // 照原版播放键的实际尺寸做，别自己定大小
+            int transportSize = 16;
+            if (stack != null && stack.elements.Count > 0 && stack.elements[0] != null)
+            {
+                transportSize = Mathf.Max(8, stack.elements[0].heightPixels);
+            }
+            ModEntry.Log?.Log("按钮按 " + transportSize + "px 排");
+
+            var button = MakeIconButton("icon_netease", "云", Open, transportSize);
+            button.SetDescription("扫码登录网易云，点歌变成磁带，用这台机器播放");
+
+            var lyricButton = MakeIconButton("icon_lyrics", "词", Lyrics.Toggle, transportSize);
+            lyricButton.SetDescription("开关桌面歌词");
+
+            var lyricSetButton = MakeIconButton("icon_settings", "设", LyricPanel.Open, transportSize);
+            lyricSetButton.SetDescription("歌词的字号、颜色和位置");
+
+            var modeRow = BuildModeRow(transportSize);
             if (stack != null)
             {
-                stack.Add(button);
-                stack.Add(lyricButton);
-                stack.Add(lyricSetButton);
+                // 上面一行放我们的按钮，中间是原版播放键，下面一行是播放模式
+                var outer = new MachineryStack(true, 6);
+                controls.SetContent(outer);
+                stack.ResizePixels(0, 0);   // 它之前被面板撑满了整块，不清掉会把行距拉开
+                outer.Add(MachineryStack.Horizontal(button, lyricButton, lyricSetButton));
+                outer.Add(stack);
+                outer.Add(modeRow);
             }
             else
             {
-                var panel = new MachineryPanel("网易云", MachineryStack.Horizontal(button, lyricButton, lyricSetButton), "cloud");
+                var content = MachineryStack.Vertical(
+                    MachineryStack.Horizontal(button, lyricButton, lyricSetButton),
+                    modeRow);
+                var panel = new MachineryPanel("网易云", content, "cloud");
                 row.Add(panel);
                 controls = panel;
             }
+            RefreshModeButtons();
             if (controls != null && controls.role == null)
             {
                 controls.SetRole("cloud");
@@ -747,6 +902,18 @@ namespace NeteaseCassette
         }
 
         // 列表行
+
+        // 列表超过一页时的翻页条
+        private static void AddPager(CustomUIBuilder builder, int page, int pages, int total, Action<int> go)
+        {
+            if (pages <= 1) return;
+
+            builder.BeginRow();
+            if (page > 0) builder.AddButton("上一页", () => go(page - 1));
+            builder.AddLabel(" 第 " + (page + 1) + "/" + pages + " 页，共 " + total + " 首 ");
+            if (page + 1 < pages) builder.AddButton("下一页", () => go(page + 1));
+            builder.End();
+        }
 
         private static void AddSongRow(CustomUIBuilder builder, NcSong song, int index)
         {
