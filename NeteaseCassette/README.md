@@ -13,12 +13,14 @@
   `persistentDataPath/ModData/netease_cassette/session.json`，下次进游戏不用再扫。
 - **不登录也能搜歌、放免费歌**；会员歌 / 版权受限的歌没登录只会拿到 128k 或者干脆没有地址，
   日志里能看到原因，播放器会自己停下来。
-- 点歌会**真的生成一盘磁带**放进磁带仓（满 36 格），磁带跟着存档走。想清空就把磁带扔了。
+- 点歌会**真的生成一盘磁带**放进磁带仓，占格跟原版磁带一样，塞满了就提示。想清空直接把磁带扔了。图案从 `Textures/Items` 的 64 张卡带图里随机挑。
+- 歌词：播放云曲目时会顺手拉一次歌词，点播放器上的 **「词」** 开关，**「设」** 调样式。桌面歌词式浮层，只有当前句 + 下一句，透明背景、不挡点击；当前句唱过的部分保持亮色，没唱到的压暗，一眼能看出进度。字号、当前句颜色都能调，位置可以直接拖着走再点锁定。设置存在 `ModData/netease_cassette/lyrics.json`。版权方没给词（纯音乐、现场版）就显示「纯音乐，没有歌词」。
+- 云磁带的价值是 **0**：不参与店铺估值、提示框里也不会显示价格行（游戏对 0 价值物品就是不显示），别指望拿它当货卖。
 - 《用户协议》之类的事自己斟酌，账号风险自负。
 
 ## 怎么用
 
-1. 进店，点柜台上的磁带播放器，窗口右边多了一个 **「云」** 按钮。
+1. 进店，点柜台上的磁带播放器，控制区多了一个 **「云」** 按钮（旁边那个 **「词」** 是歌词开关）。
 2. 点它打开「网易云音乐 · 磁带机」。
 3. 「扫码登录」标签页里扫码；不登录也行，直接去「搜索」。
 4. 搜到歌点一下：生成磁带 → 放进磁带仓 → 开始缓冲 → 出声。
@@ -35,7 +37,7 @@
   原版会把播放状态重置成停止。
 - 音频走 `DownloadHandlerAudioClip(url, AudioType.MPEG)`，下完丢进游戏自己的 `audioSourceMusic`。
   所以音量滑块、暂停、切场景静音这些都跟原版一致，没有自己另开 AudioSource。
-- 二维码是自己画的（`src/QrCode.cs`，纯 C#，不依赖外部库）。
+- 二维码是自己画的（`src/QrCode.cs`，纯 C#，不依赖外部库），矩阵验证见 `tools/QrProbe`。
 - HTTP 只有一处：`src/UnityTransport.cs`，用 `UnityWebRequest` + 表单 POST。
   清单里因此声明了 `network` 能力。
 
@@ -44,15 +46,18 @@
 ```
 NeteaseCassette/
 ├── manifest.xml              清单（ID: netease_cassette，能力: network）
-└── src/
-    ├── ModEntry.cs           入口，存档级会话、调试按钮
-    ├── Patches.cs            Harmony：磁带机加按钮、拦 PlayMusic / CanPlay / Stop / Pause
-    ├── CloudWindow.cs        CustomUI 窗口：扫码、搜索、歌单、点歌
-    ├── StreamPlayer.cs       要地址 → 下载 → 丢进 audioSourceMusic
-    ├── NeteaseApi.cs         网易云接口客户端（不依赖 Unity，能单独跑）
-    ├── UnityTransport.cs     INcTransport 的 UnityWebRequest 实现
-    ├── QrCode.cs             QR 编码器（纯 C#）
-    └── QrSprite.cs           QR 矩阵 → Texture2D / Sprite
+├── src/
+│   ├── ModEntry.cs           入口、登录态、调试按钮
+│   ├── Patches.cs            Harmony：磁带机加按钮、拦 PlayMusic / CanPlay / Stop / Pause
+│   ├── CloudWindow.cs        CustomUI 窗口：扫码、搜索、歌单、点歌
+│   ├── StreamPlayer.cs       要地址 → 下载 → 丢进 audioSourceMusic
+│   ├── NeteaseApi.cs         网易云接口客户端（不依赖 Unity，能单独跑）
+│   ├── UnityTransport.cs     INcTransport 的 UnityWebRequest 实现
+│   ├── QrCode.cs             QR 编码器（纯 C#）
+│   └── QrSprite.cs           QR 矩阵 → Texture2D / Sprite
+└── tools/                    只用于开发验证，不参与 mod 编译、不会装进 Mods
+    ├── QrProbe/              QR 矩阵打印 + 与 segno 对拍
+    └── ApiProbe/             真实接口冒烟测试
 ```
 
 ## 编译
@@ -64,6 +69,13 @@ dotnet build NeteaseCassette/NeteaseCassette.csproj -c Release
 ```
 
 编完自动拷到 `Mods\NeteaseCassette\`（dll + manifest）。进游戏 → 模组菜单启用 → 重启。
+
+## 验证工具
+
+- `dotnet run --project NeteaseCassette/tools/QrProbe -c Release -- ascii "文本"`
+  直接打印 QR 矩阵；`_extract.py` 会跟 Python 的 segno 逐模块对拍。
+- `dotnet run --project NeteaseCassette/tools/ApiProbe -c Release`
+  真实打接口：二维码 key、轮询 801、搜索、取播放地址、公开歌单。
 
 ## 已知限制
 

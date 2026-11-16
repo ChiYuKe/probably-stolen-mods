@@ -5,14 +5,15 @@ using UnityEngine.Networking;
 
 namespace NeteaseCassette
 {
-    /// <summary>
-    /// 网易云曲目的实际播放：先问 API 要地址，再下载成 AudioClip，最后丢进游戏自己的音乐音源。
-    /// 磁带本身只是带 "netease:&lt;songId&gt;" 标签的原版磁带，所以播放/暂停/下一首还是原版逻辑。
-    /// </summary>
+    // 云曲目的播放：问接口要地址、下载、丢给游戏自己的音乐音源。
+    // 磁带还是原版磁带，标签里写 netease:<id>，播放/暂停/下一首都走原版。
     public static class StreamPlayer
     {
         public const string Prefix = "netease:";
         private const int MaxConsecutiveFailures = 3;
+
+        // 正在放的云曲目，0 就是没有
+        public static long CurrentSongId { get; private set; }
 
         private static NeteaseClient client;
         private static ModLog log;
@@ -51,7 +52,7 @@ namespace NeteaseCassette
             return Prefix + songId.ToString();
         }
 
-        /// <summary>原版 AudioManager.PlayMusic 被我们拦下来后走这里。</summary>
+        // 拦住 AudioManager.PlayMusic 之后走这里
         public static void PlayCloud(string trackId)
         {
             long songId;
@@ -65,16 +66,18 @@ namespace NeteaseCassette
                 return;
             }
             Cancel();
+            CurrentSongId = songId;
+            Lyrics.OnTrackStarted(songId, null);
             ModHelper.StartCoroutine(ModEntry.ModId, LoadAndPlay(songId));
         }
 
-        /// <summary>自动连播时防止一整排坏歌把播放器卡死。</summary>
+        // 连播时别让一串坏歌把播放器卡死
         public static void ResetFailureCounter()
         {
             consecutiveFailures = 0;
         }
 
-        /// <summary>暂停时只取消还没下载完的曲目，已经出声的交给原版 PauseMusic。</summary>
+        // 暂停只撤还没下载完的，已经出声的交给原版 PauseMusic
         public static void CancelPending()
         {
             if (!clipReady)
@@ -83,11 +86,13 @@ namespace NeteaseCassette
             }
         }
 
-        /// <summary>停止 / 切回原版磁带时彻底放手。</summary>
+        // 停止或者换回原版磁带，彻底放手
         public static void Cancel()
         {
             generation++;
             clipReady = false;
+            CurrentSongId = 0;
+            Lyrics.OnStopped();
             try
             {
                 if (current != null && AudioManager.Exists)
@@ -116,7 +121,7 @@ namespace NeteaseCassette
             }
             catch
             {
-                // 已经结束的请求 Abort 会报错，忽略
+                // 已经结束的请求 Abort 会抛，忽略
             }
             try
             {
@@ -131,7 +136,7 @@ namespace NeteaseCassette
 
         private static IEnumerator LoadAndPlay(long songId)
         {
-            // 自己再套一层：任何一步抛异常都要收尾，不能让 AudioManager 的等待协程永远挂着
+            // 外面再包一层，哪一步抛异常都要收尾，不然 AudioManager 的等待协程会一直挂着
             var inner = LoadAndPlayCore(songId);
             while (true)
             {
@@ -172,7 +177,7 @@ namespace NeteaseCassette
             UnityWebRequestAsyncOperation op = null;
             try
             {
-                // 和游戏自己加载 mod 里的 mp3 用的是同一条路：UnityWebRequestMultimedia + DownloadHandlerAudioClip
+                // 跟游戏加载 mod 里 mp3 是同一条路：UnityWebRequestMultimedia + DownloadHandlerAudioClip
                 req = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG);
                 handler = req.downloadHandler as DownloadHandlerAudioClip;
                 req.timeout = 30;
@@ -245,7 +250,7 @@ namespace NeteaseCassette
             consecutiveFailures = 0;
             log?.Log("开始播放网易云曲目 " + songId);
 
-            // 解码出来的若是空音频，Play() 不会真的开始，原版的 WaitForSound 会一直挂着
+            // 空音频 Play() 不会出声，原版 WaitForSound 会一直等
             yield return null;
             if (gen != generation) yield break;
             if (!source.isPlaying)
@@ -258,6 +263,8 @@ namespace NeteaseCassette
         private static void Fail(string message)
         {
             consecutiveFailures++;
+            CurrentSongId = 0;
+            Lyrics.OnStopped();
             log?.Warning("网易云播放失败：" + message);
             try
             {
@@ -283,6 +290,40 @@ namespace NeteaseCassette
                 consecutiveFailures = 0;
                 log?.Warning("连续几首都放不出来，先停一会儿");
             }
+        }
+
+        // 磁带上写的歌名（「音乐磁带 - XXX」里的 XXX），歌词窗口拿来当标题
+        public static string CurrentCassetteTitle()
+        {
+            if (CurrentSongId <= 0) return null;
+            string trackId = TrackId(CurrentSongId);
+            try
+            {
+                string title = FindCassetteTitle(MachineCassettePlayer.GetCassetteInventory(), trackId);
+                if (title != null) return title;
+                var machine = EmporiumEntry.Instance != null ? EmporiumEntry.Instance.cassettePlayer : null;
+                if (machine == null) return null;
+                return FindCassetteTitle(MachineHelper.GetBodyStorage(machine, 0) as GameInventory, trackId);
+            }
+            catch (Exception e)
+            {
+                log?.Warning("找磁带标题失败：" + e.Message);
+                return null;
+            }
+        }
+
+        private static string FindCassetteTitle(GameInventory inventory, string trackId)
+        {
+            if (inventory == null) return null;
+            foreach (var item in inventory.childItems)
+            {
+                if (item == null || !item.IsTag(CassetteHelper.CASSETTE_TAG) || !item.IsTag(CassetteHelper.CASSETTE_CONTENT)) continue;
+                if (item.GetTagReadonly(CassetteHelper.CASSETTE_CONTENT).GetString() != trackId) continue;
+                string name = item.name ?? "";
+                int dash = name.IndexOf(" - ", StringComparison.Ordinal);
+                return dash >= 0 ? name.Substring(dash + 3) : name;
+            }
+            return null;
         }
 
         private static void RefreshFrames(GameItem machine)

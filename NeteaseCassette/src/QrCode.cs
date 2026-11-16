@@ -1,22 +1,14 @@
 // QrCode.cs
-//
-// Dependency-free QR Code (model 2) encoder.
-//
-// Scope: byte mode (0100) with UTF-8 payloads, versions 1..15, EC levels L/M/Q/H.
-// No UnityEngine / System.IO / NuGet / async; safe to call repeatedly and from any thread.
-//
-// Structure follows ISO/IEC 18004 (and the well-known public-domain reference
-// implementation by Project Nayuki) so that the produced symbols match mainstream
-// encoders such as segno / ZXing module for module.
+// 二维码编码器（Model 2），只做字节模式、版本 1~15、L/M/Q/H 四档纠错。
+// 参数表照 ISO 18004 抄的，矩阵跟 segno、ZXing 逐块对过。
+// 不依赖 UnityEngine 和外部库，游戏里那个登录二维码就是它画的。
 
 using System;
 using System.Text;
 
 namespace NeteaseCassette
 {
-    /// <summary>
-    /// Pure C# QR code encoder used to draw the NetEase Cloud Music login QR in game.
-    /// </summary>
+    // 纯 C# 的 QR 编码器，画登录二维码用
     public static class QrCode
     {
         public const int EccLow = 0;
@@ -32,7 +24,7 @@ namespace NeteaseCassette
         private const int PenaltyN3 = 40;
         private const int PenaltyN4 = 10;
 
-        // EC codewords per block. Index 0 is a padding entry, index 1..15 is the version.
+        // 每块的纠错码字数，下标 1 起是版本，0 空着
         private static readonly int[][] EccCodewordsPerBlock =
         {
             new int[] { -1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22 },  // L
@@ -41,7 +33,7 @@ namespace NeteaseCassette
             new int[] { -1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24 }, // H
         };
 
-        // Number of error correction blocks. Index 0 is a padding entry, index 1..15 is the version.
+        // 纠错块数，下标同上
         private static readonly int[][] EccBlockCount =
         {
             new int[] { -1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6 },        // L
@@ -50,10 +42,10 @@ namespace NeteaseCassette
             new int[] { -1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18 },  // H
         };
 
-        // 5-bit format information value per EC level (L=1, M=0, Q=3, H=2).
+        // 每档纠错在格式信息里对应的 5 位值（L=1 M=0 Q=3 H=2）
         private static readonly int[] EccFormatBits = { 1, 0, 3, 2 };
 
-        // GF(256) exp / log tables, primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D).
+        // GF(256) 的指数/对数表，本原多项式 x^8+x^4+x^3+x^2+1（0x11D）
         private static readonly byte[] GfExp;
         private static readonly byte[] GfLog;
 
@@ -75,21 +67,13 @@ namespace NeteaseCassette
             GfExp[255] = GfExp[0];
         }
 
-        /// <summary>
-        /// Encodes <paramref name="text"/> as a QR code matrix (no quiet zone, [y, x], true = dark).
-        /// Returns null when the payload does not fit the supported versions.
-        /// </summary>
+        // 生成矩阵，[y, x]，true 是黑块，不含静区。放不下返回 null。
         public static bool[,] Encode(string text, int eccLevel = EccMedium)
         {
             return Encode(text, eccLevel, -1, 0);
         }
 
-        /// <summary>
-        /// Encodes <paramref name="text"/> with full control.
-        /// forceMask: -1 = pick the mask with the lowest standard penalty, 0..7 = force that mask.
-        /// forceVersion: 0 = smallest version that fits, 1..15 = force that version.
-        /// Returns null when the payload does not fit (or an argument is out of range).
-        /// </summary>
+        // 同上，但能强制掩码和版本。forceMask 传 -1 就自动挑，forceVersion 传 0 用最小的。
         public static bool[,] Encode(string text, int eccLevel, int forceMask, int forceVersion)
         {
             if (text == null)
@@ -168,9 +152,7 @@ namespace NeteaseCassette
             return best;
         }
 
-        // ------------------------------------------------------------------
-        // Capacity / bit stream
-        // ------------------------------------------------------------------
+        // 容量和码字
 
         private static bool Fits(int byteLength, int version, int eccLevel)
         {
@@ -213,7 +195,7 @@ namespace NeteaseCassette
             }
         }
 
-        // Builds the final, interleaved codeword sequence (data + EC) for one version / level.
+        // 把数据码字和纠错码字交织成最终序列
         private static byte[] BuildCodewords(byte[] payload, int version, int eccLevel)
         {
             int dataCodewords = GetNumDataCodewords(version, eccLevel);
@@ -228,7 +210,7 @@ namespace NeteaseCassette
                 return null;
             }
 
-            // Bit stream: mode indicator + character count + payload.
+            // 模式 + 字符数 + 内容
             byte[] bits = new byte[dataCodewords];
             int bitLength = 0;
             AppendBits(bits, ref bitLength, 4, 4); // byte mode = 0100
@@ -238,17 +220,17 @@ namespace NeteaseCassette
                 AppendBits(bits, ref bitLength, payload[i], 8);
             }
 
-            // Terminator (up to four zero bits), then pad to a byte boundary.
+            // 结束符，补到整字节
             AppendBits(bits, ref bitLength, 0, Math.Min(4, capacityBits - bitLength));
             AppendBits(bits, ref bitLength, 0, (8 - (bitLength & 7)) & 7);
 
-            // Pad codewords 0xEC / 0x11 until the data capacity is full.
+            // 拿 0xEC / 0x11 填满数据区
             for (int pad = 0xEC; bitLength < capacityBits; pad ^= 0xEC ^ 0x11)
             {
                 AppendBits(bits, ref bitLength, pad, 8);
             }
 
-            // Split into blocks, append Reed-Solomon codewords, then interleave.
+            // 分块、算纠错、再交织
             int numBlocks = EccBlockCount[eccLevel][version];
             int eccLength = EccCodewordsPerBlock[eccLevel][version];
             int rawCodewords = GetNumRawDataModules(version) / 8;
@@ -298,9 +280,7 @@ namespace NeteaseCassette
             return position == rawCodewords ? result : null;
         }
 
-        // ------------------------------------------------------------------
-        // Reed-Solomon over GF(256)
-        // ------------------------------------------------------------------
+        // Reed-Solomon，GF(256) 上算
 
         private static byte GfMul(byte a, byte b)
         {
@@ -316,7 +296,7 @@ namespace NeteaseCassette
             return GfExp[sum];
         }
 
-        // Generator polynomial coefficients (highest degree first, leading 1 omitted).
+        // 生成多项式系数，最高次在前，首项那个 1 省了
         private static byte[] ReedSolomonDivisor(int degree)
         {
             byte[] result = new byte[degree];
@@ -356,9 +336,7 @@ namespace NeteaseCassette
             return result;
         }
 
-        // ------------------------------------------------------------------
-        // Matrix construction
-        // ------------------------------------------------------------------
+        // 画矩阵
 
         private static bool[,] BuildMatrix(byte[] codewords, int version, int eccLevel, int mask)
         {
@@ -384,19 +362,19 @@ namespace NeteaseCassette
         {
             int size = version * 4 + 17;
 
-            // Timing patterns (may be overwritten by alignment patterns later).
+            // 定位图形，后面可能被校正图形盖掉
             for (int i = 0; i < size; i++)
             {
                 SetFunction(modules, isFunction, 6, i, (i & 1) == 0);
                 SetFunction(modules, isFunction, i, 6, (i & 1) == 0);
             }
 
-            // Finder patterns and their separators.
+            // 三个角上的定位图形和旁边的分隔带
             DrawFinderPattern(modules, isFunction, size, 3, 3);
             DrawFinderPattern(modules, isFunction, size, size - 4, 3);
             DrawFinderPattern(modules, isFunction, size, 3, size - 4);
 
-            // Alignment patterns, skipping the three finder corners.
+            // 校正图形，三个角跳过
             int[] align = GetAlignmentPatternPositions(version);
             for (int i = 0; i < align.Length; i++)
             {
@@ -473,7 +451,7 @@ namespace NeteaseCassette
             }
             int bits = ((data << 10) | remainder) ^ 0x5412;
 
-            // First copy, around the top-left finder pattern.
+            // 格式信息第一份，围着左上角
             for (int i = 0; i <= 5; i++)
             {
                 SetFunction(modules, isFunction, 8, i, GetBit(bits, i));
@@ -486,7 +464,7 @@ namespace NeteaseCassette
                 SetFunction(modules, isFunction, 14 - i, 8, GetBit(bits, i));
             }
 
-            // Second copy, split between the top-right and bottom-left corners.
+            // 第二份，右上和左下各一半
             for (int i = 0; i < 8; i++)
             {
                 SetFunction(modules, isFunction, size - 1 - i, 8, GetBit(bits, i));
@@ -496,7 +474,7 @@ namespace NeteaseCassette
                 SetFunction(modules, isFunction, 8, size - 15 + i, GetBit(bits, i));
             }
 
-            // The fixed dark module.
+            // 那个固定黑块
             SetFunction(modules, isFunction, 8, size - 8, true);
         }
 
@@ -587,15 +565,13 @@ namespace NeteaseCassette
             }
         }
 
-        // ------------------------------------------------------------------
-        // Penalty scoring (ISO/IEC 18004, rules N1..N4)
-        // ------------------------------------------------------------------
+        // 掩码打分，N1~N4
 
         private static int PenaltyScore(bool[,] modules, int size)
         {
             int result = 0;
 
-            // Rule 1 (runs of five or more) and rule 3 (finder-like patterns): rows.
+            // N1 连续同色、N3 像定位图形：按行扫
             for (int y = 0; y < size; y++)
             {
                 bool runColor = false;
@@ -629,7 +605,7 @@ namespace NeteaseCassette
                 result += FinderPenaltyTerminateAndCount(runColor, runLength, runHistory, size) * PenaltyN3;
             }
 
-            // Rule 1 and rule 3: columns.
+            // N1、N3：按列扫
             for (int x = 0; x < size; x++)
             {
                 bool runColor = false;
@@ -663,7 +639,7 @@ namespace NeteaseCassette
                 result += FinderPenaltyTerminateAndCount(runColor, runLength, runHistory, size) * PenaltyN3;
             }
 
-            // Rule 2: 2x2 blocks of the same color.
+            // N2 同色 2×2
             for (int y = 0; y < size - 1; y++)
             {
                 for (int x = 0; x < size - 1; x++)
@@ -676,7 +652,7 @@ namespace NeteaseCassette
                 }
             }
 
-            // Rule 4: balance of dark and light modules.
+            // N4 黑白比例
             int dark = 0;
             for (int y = 0; y < size; y++)
             {

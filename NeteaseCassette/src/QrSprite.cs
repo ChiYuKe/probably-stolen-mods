@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace NeteaseCassette
 {
-    /// <summary>把 QR 模块矩阵画成 Unity 贴图 / Sprite，给 CustomUI 的图片控件用。</summary>
+    // QR 矩阵画成 Texture2D/Sprite，给 CustomUI 的图片控件用
     public static class QrSprite
     {
         private static Texture2D lastTexture;
@@ -27,7 +27,7 @@ namespace NeteaseCassette
                 {
                     if (!matrix[my, mx]) continue;
                     int x0 = (mx + quietZone) * scale;
-                    // Unity 贴图原点在左下角，矩阵原点在左上角，这里翻一下，避免二维码被镜像扫不出来
+                    // 贴图原点在左下角，矩阵在左上角，翻一下，不然二维码是镜像的扫不出来
                     int y0 = (modules - 1 - my + quietZone) * scale;
                     for (int dy = 0; dy < scale; dy++)
                     {

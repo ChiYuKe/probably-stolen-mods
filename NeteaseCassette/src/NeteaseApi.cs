@@ -1,19 +1,13 @@
 // NeteaseApi.cs
-// 网易云音乐 HTTP 客户端（协程风格：无 async/Task/Thread，无 Unity 类型）。
+// 网易云 HTTP 客户端。全程协程，不碰 async/Task/Thread，也不引 UnityEngine，
+// 所以能直接拿控制台跑（tools/ApiProbe 就是这么测的）。
 //
-// 重要：给 INcTransport 实现方的约定
-//   * 每个请求都是 form-encoded POST，NcRequest.Url 已含完整 host。
-//   * NcRequest.Headers 已经由 NeteaseClient 填好（User-Agent / Referer / Origin / Cookie），
-//     transport 只要把这些头原样加上去，不要自己拼请求头、也不要自己维护 cookie 容器。
-//     漏掉这些头会被网易云以 -462 “网络环境风险” 拒绝。
-//   * Set-Cookie 响应头原样塞进 NcResponse.SetCookie（一句一个元素），客户端自己合并。
-//   * NeteaseClient.CookieHeader 是当前 jar 的完整字符串，仅供调试/观测。
+// 给 transport 实现方的约定：NcRequest 里 Url 和 Headers 都填好了（UA / Referer / Origin / Cookie），
+// 照抄就行，别自己拼头也别自己存 cookie。少这几个头网易云会甩 -462「网络环境风险」。
+// Set-Cookie 原样塞进 NcResponse.SetCookie，客户端自己合。
 //
-// 设计要点：
-//   * 所有公开协程只 yield return null，绝不 yield 嵌套 IEnumerator，
-//     这样 Unity 协程和 `while (e.MoveNext()) { }` 这种土制 pump 都能驱动。
-//   * 任何异常都在内部吃掉，转成 onError / 日志，绝不逃出 IEnumerator。
-//   * 相邻两次 HTTP 之间至少间隔 250ms（按时间戳算，不 Sleep，返回 null 让调用方泵帧）。
+// 另外两条：公开协程只 yield return null，不嵌套 IEnumerator，这样 Unity 协程和
+// while (e.MoveNext()) 的土制 pump 都能驱动；异常全部内部吃掉转成 onError。
 
 using System;
 using System.Collections;
@@ -33,7 +27,7 @@ namespace NeteaseCassette
         public string Album;
         public int DurationMs;
 
-        /// <summary>“歌名 - 歌手”，歌手为空时不带尾部 “ - ”。</summary>
+        // 「歌名 - 歌手」，没歌手就只留歌名
         public string Display
         {
             get
@@ -53,11 +47,18 @@ namespace NeteaseCassette
         public int TrackCount;
         public bool IsLiked;
 
-        /// <summary>“歌单名 (N)”。</summary>
+        // 「歌单名 (N)」
         public string Display
         {
             get { return (Name ?? "") + " (" + TrackCount.ToString(CultureInfo.InvariantCulture) + ")"; }
         }
+    }
+
+    public sealed class NcLyric
+    {
+        public string Raw = "";          // 原词，LRC 格式
+        public string Translation = "";  // 翻译，LRC 格式，可能没有
+        public bool Instrumental;        // 纯音乐 / 没歌词
     }
 
     public sealed class NcRequest
@@ -79,7 +80,7 @@ namespace NeteaseCassette
 
     public interface INcTransport
     {
-        // Yields while the request is in flight, then invokes onDone exactly once (must not throw).
+        // 请求没跑完就一直 yield，完了回调一次 onDone，别在里面抛
         IEnumerator Send(NcRequest req, Action<NcResponse> onDone);
     }
 
@@ -94,7 +95,7 @@ namespace NeteaseCassette
         internal const string UserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 
-        /// <summary>两次 HTTP 之间至少间隔的毫秒数。</summary>
+        // 两次 HTTP 之间至少空这么久
         internal const int MinGapMs = 250;
 
         const string PathAccount = "/api/nuser/account/get";
@@ -106,11 +107,12 @@ namespace NeteaseCassette
         const string PathPlaylistDetailV6 = "/api/v6/playlist/detail";
         const string PathPlaylistDetailOld = "/api/playlist/detail";
         const string PathSongDetail = "/api/song/detail";
+        const string PathSongLyric = "/api/song/lyric";
 
         readonly INcTransport _transport;
         readonly Action<string> _log;
 
-        // 有序 cookie jar：Dictionary 保证查找，List 保证输出顺序（Export/Import 往返稳定）。
+        // cookie 存两份：Dictionary 查得快，List 记顺序，导出/导入才不会乱
         readonly Dictionary<string, string> _jar = new Dictionary<string, string>(StringComparer.Ordinal);
         readonly List<string> _jarOrder = new List<string>();
 
@@ -134,13 +136,13 @@ namespace NeteaseCassette
             EnsureDefaultCookies();
         }
 
-        // ---------------------------------------------------------------- 状态
+        // 状态
 
         public bool IsLoggedIn { get { return _loggedIn; } }
         public long UserId { get { return _userId; } }
         public string Nickname { get { return _nickname ?? ""; } }
 
-        /// <summary>当前完整 Cookie 头。这既是调试信息，也是 transport 取 cookie 的唯一通道。</summary>
+        // 当前 Cookie 头，调试和 transport 都看它
         public string CookieHeader
         {
             get
@@ -230,7 +232,7 @@ namespace NeteaseCassette
             }
         }
 
-        // ---------------------------------------------------------------- 账号
+        // 账号
 
         public IEnumerator CheckAccount(Action<bool> done)
         {
@@ -285,7 +287,7 @@ namespace NeteaseCassette
             Log("CheckAccount -> loggedIn=" + _loggedIn + " userId=" + _userId + " nick=" + _nickname);
         }
 
-        // ---------------------------------------------------------------- 扫码登录
+        // 扫码登录
 
         public IEnumerator QrCreate(Action<string> onKey, Action<string> onError)
         {
@@ -395,12 +397,12 @@ namespace NeteaseCassette
 
             if (code == QrConfirmed)
             {
-                // 803 之后必须先把账号信息填好，再回调 onCode(803)
+                // 803 之后先补账号信息，再回调
                 var ab = new NcBox<bool>();
                 yield return CheckAccountCore(ab);
                 if (!ab.Value && HasCookie("MUSIC_U"))
                 {
-                    // 有 MUSIC_U 但账号接口暂时没回话，先乐观标记已登录，下一次 CheckAccount 会纠正
+                    // 有 MUSIC_U 但账号接口没回话，先当登录成功，下次 CheckAccount 再纠正
                     _loggedIn = true;
                 }
                 if (_loggedIn)
@@ -437,7 +439,7 @@ namespace NeteaseCassette
             }
         }
 
-        // ---------------------------------------------------------------- 搜索
+        // 搜索
 
         public IEnumerator Search(string keyword, int limit, Action<List<NcSong>> onSongs, Action<string> onError)
         {
@@ -520,7 +522,7 @@ namespace NeteaseCassette
             box.Value = list;
         }
 
-        // ---------------------------------------------------------------- 播放地址
+        // 播放地址
 
         public IEnumerator GetSongUrl(long songId, Action<string> onUrl, Action<string> onError)
         {
@@ -558,7 +560,7 @@ namespace NeteaseCassette
 
             if (string.IsNullOrEmpty(url) && preferHigh)
             {
-                // exhigh 拿不到（会员/版权）就退回 standard 再试一次
+                // exhigh 拿不到（会员/版权）就退 standard 再问一次
                 yield return SendPost(PathSongUrl, SongUrlForm(songId, "standard"), rb);
                 url = ExtractSongUrl(rb.Value, out lastError);
             }
@@ -612,7 +614,70 @@ namespace NeteaseCassette
             return f;
         }
 
-        // ---------------------------------------------------------------- 歌单
+        // 歌词
+
+        public IEnumerator GetLyric(long songId, Action<NcLyric> onLyric, Action<string> onError)
+        {
+            var box = new NcBox<NcLyric>();
+            var pump = new NcSafePump(GetLyricCore(songId, box));
+            while (pump.MoveNext()) yield return null;
+            if (pump.Error != null && box.Error == null) box.Error = pump.Error;
+            if (box.Error != null)
+            {
+                Log("GetLyric(" + songId + "): " + box.Error);
+                Invoke(onError, box.Error);
+            }
+            else
+            {
+                Invoke(onLyric, box.Value);
+            }
+        }
+
+        IEnumerator GetLyricCore(long songId, NcBox<NcLyric> box)
+        {
+            if (songId <= 0)
+            {
+                box.Error = "歌曲 ID 无效";
+                yield break;
+            }
+
+            var form = new Dictionary<string, string>();
+            form["id"] = songId.ToString(CultureInfo.InvariantCulture);
+            form["lv"] = "-1";
+            form["kv"] = "-1";
+            form["tv"] = "-1";
+
+            var rb = new NcBox<NcResponse>();
+            yield return SendPost(PathSongLyric, form, rb);
+
+            NcResponse res = rb.Value;
+            if (res == null)
+            {
+                box.Error = "请求失败";
+                yield break;
+            }
+            if (res.Error != null)
+            {
+                box.Error = res.Error;
+                yield break;
+            }
+
+            JObject o = ParseObject(NormalizeText(res.Text));
+            if (o == null)
+            {
+                box.Error = "歌词响应不是合法 JSON";
+                yield break;
+            }
+
+            var lyric = new NcLyric();
+            lyric.Raw = GetString(Prop(Prop(o, "lrc"), "lyric"));
+            lyric.Translation = GetString(Prop(Prop(o, "tlyric"), "lyric"));
+            lyric.Instrumental = GetLong(Prop(o, "nolyric"), 0) != 0 || GetLong(Prop(o, "uncollected"), 0) != 0;
+            Log("GetLyric(" + songId + ") -> " + lyric.Raw.Length + " 字");
+            box.Value = lyric;
+        }
+
+        // 歌单
 
         public IEnumerator GetPlaylists(Action<List<NcPlaylist>> onLists, Action<string> onError)
         {
@@ -635,7 +700,7 @@ namespace NeteaseCassette
         {
             if (_userId <= 0 || !_loggedIn)
             {
-                // 连 MUSIC_U 都没有，肯定没登录，别白跑一次接口
+                // 连 MUSIC_U 都没有，就是没登录，省一次请求
                 if (HasCookie("MUSIC_U"))
                 {
                     var ab = new NcBox<bool>();
@@ -780,11 +845,11 @@ namespace NeteaseCassette
             return list;   // 可能是空列表（空歌单 / 所有曲目都没权限）
         }
 
-        // ---------------------------------------------------------------- HTTP
+        // HTTP
 
         IEnumerator SendPost(string path, Dictionary<string, string> form, NcBox<NcResponse> box)
         {
-            // 节流：距离上次请求结束不足 250ms 就返回 null 让调用方泵帧
+            // 节流：离上次请求不到 250ms 就 yield null，让调用方接着泵帧
             while (true)
             {
                 if (_lastCallTicks == 0) break;
@@ -821,7 +886,7 @@ namespace NeteaseCassette
             return new Dictionary<string, string>();
         }
 
-        /// <summary>每个请求固定要带的头（cookie 每次都取当前 jar，登录后会变）。</summary>
+        // 每个请求都要带的头，cookie 现取，登录后会变
         Dictionary<string, string> BuildHeaders()
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -832,7 +897,7 @@ namespace NeteaseCassette
             return headers;
         }
 
-        // ---------------------------------------------------------------- cookie
+        // cookie
 
         void EnsureDefaultCookies()
         {
@@ -897,11 +962,11 @@ namespace NeteaseCassette
             }
         }
 
-        /// <summary>解析 Set-Cookie 头或 JSON cookie 字符串，容错地往里塞。</summary>
+        // 解析 Set-Cookie 或者 JSON 里的 cookie，能塞多少塞多少
         void ParseCookieText(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
-            // 一条头里可能有多块 cookie（用 ", " 连接），每块里又有 "attr=value"
+            // 一个头里可能好几块 cookie（逗号连着），每块后面还跟一串属性
             string[] pieces = text.Split(',');
             for (int p = 0; p < pieces.Length; p++)
             {
@@ -954,7 +1019,7 @@ namespace NeteaseCassette
             return sb.ToString();
         }
 
-        // ---------------------------------------------------------------- 解析工具
+        // 解析工具
 
         static string NormalizeText(string s)
         {
@@ -1111,7 +1176,7 @@ namespace NeteaseCassette
             return list;
         }
 
-        // ---------------------------------------------------------------- 回调 / 日志
+        // 回调 / 日志
 
         void Log(string message)
         {
@@ -1122,7 +1187,7 @@ namespace NeteaseCassette
             }
             catch
             {
-                // 日志回调自己炸了也不能影响主流程
+                // 日志回调自己抛了也不能影响主流程
             }
         }
 
@@ -1140,7 +1205,7 @@ namespace NeteaseCassette
         }
     }
 
-    // -------------------------------------------------------------------- 内部类型
+    // 内部类型
 
     internal sealed class NcBox<T>
     {
@@ -1155,7 +1220,7 @@ namespace NeteaseCassette
         public string Error;
     }
 
-    /// <summary>把 transport 的协程包裹成人畜无害的 MoveNext（异常一律转 Error）。</summary>
+    // transport 的协程包一层，异常一律转成 Error
     internal sealed class NcTransportRunner
     {
         readonly INcTransport _transport;
@@ -1238,11 +1303,8 @@ namespace NeteaseCassette
         }
     }
 
-    /// <summary>
-    /// 内部协程的保险丝：任何异常都变成 Error。
-    /// 同时像 Unity 那样驱动嵌套 IEnumerator（yield return 子协程），
-    /// 这样公开协程的调用方用 `while (e.MoveNext()) { }` 这种土制 pump 也能跑。
-    /// </summary>
+    // 内部协程的保险丝：异常一律转成 Error，顺便像 Unity 那样驱动嵌套协程，
+    // 这样外部 while (e.MoveNext()) 也能跑。
     internal sealed class NcSafePump
     {
         readonly Stack<IEnumerator> _stack = new Stack<IEnumerator>();

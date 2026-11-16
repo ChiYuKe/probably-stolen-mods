@@ -1,9 +1,10 @@
 using System;
 using HarmonyLib;
+using UnityEngine;
 
 namespace NeteaseCassette
 {
-    /// <summary>磁带机窗口多一块「网易云」面板，点按钮打开扫码 / 点歌窗口。</summary>
+    // 磁带机窗口多一个「云」按钮，点了开扫码/点歌窗口
     [HarmonyPatch(typeof(MachineCassettePlayer), nameof(MachineCassettePlayer.CassettePlayer))]
     internal static class CassettePlayerPatch
     {
@@ -20,7 +21,7 @@ namespace NeteaseCassette
         }
     }
 
-    /// <summary>"netease:123" 这种曲目不走 AudioDirectory，交给 StreamPlayer 现拉现放。</summary>
+    // netease:xxx 不走音频表，交给 StreamPlayer 现拉
     [HarmonyPatch(typeof(AudioManager), nameof(AudioManager.PlayMusic))]
     internal static class PlayMusicPatch
     {
@@ -43,7 +44,7 @@ namespace NeteaseCassette
         }
     }
 
-    /// <summary>AudioDirectory 里当然没有云曲目，这里直接回答“能放”，不然读档会把播放状态重置掉。</summary>
+    // 音频表里没云曲目，这里直接说能放，不然读档会把播放状态清掉
     [HarmonyPatch(typeof(AudioManager), nameof(AudioManager.CanPlay))]
     internal static class CanPlayPatch
     {
@@ -90,30 +91,24 @@ namespace NeteaseCassette
         }
     }
 
-    /// <summary>
-    /// 旧版本（0.1 早期）生成的云磁带 identifier 是 null，直接调 MusicCassette 造出来的。
-    /// identifier 为 null 的物品在游戏里会到处空引用，存档也没法还原，
-    /// 所以读档前先把这些节点改成注册过的云磁带 ID。
-    /// </summary>
-    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.DecodeNodes))]
-    internal static class SaveMigratePatch
+    // 存档里的贴图键找不到时兜个底：把那个键直接指到一张现成的卡带图上，
+    // 不然改过贴图命名的存档会满屏问号。
+    [HarmonyPatch(typeof(GameItemElement), nameof(GameItemElement.ResolveSpriteByName))]
+    internal static class ModSpriteFallbackPatch
     {
-        private static void Prefix(System.Collections.Generic.List<SaveItemNode> savedItems)
+        private static bool Prefix(GameItemElement __instance, string name, ref Sprite __result)
         {
-            if (savedItems == null) return;
-            int fixedCount = 0;
-            foreach (var node in savedItems)
-            {
-                if (node == null) continue;
-                if (!string.IsNullOrEmpty(node.identifier)) continue;
-                if (node.itemState == null || !node.itemState.IsTag(CassetteHelper.CASSETTE_TAG)) continue;
-                node.identifier = ModEntry.TapeItemId;
-                fixedCount++;
-            }
-            if (fixedCount > 0)
-            {
-                ModEntry.Log?.Log("读档前修正了 " + fixedCount + " 盘没登记过 ID 的旧云磁带");
-            }
+            if (!__instance.useSpriteFromMod) return true;
+            if (__instance.spriteAtlasPath != ModEntry.ModId) return true;
+
+            var mod = ModLoader.Mods.Find(m => m.Manifest.ID == ModEntry.ModId);
+            if (mod == null || mod.Sprites.ContainsKey(name)) return true;
+
+            Sprite replacement;
+            if (!ModEntry.TryPickTapeSpriteFor(name, out replacement)) return true;
+            mod.Sprites[name] = replacement;
+            __result = replacement;
+            return false;
         }
     }
 }

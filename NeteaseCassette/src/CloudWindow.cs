@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace NeteaseCassette
 {
-    /// <summary>游戏里的网易云窗口：扫码登录、搜索、我的歌单，点歌生成磁带并直接播放。</summary>
+    // 网易云窗口：扫码、搜索、歌单，点歌生成磁带并直接播放
     public static class CloudWindow
     {
         private const string WindowId = "netease_cassette.cloud";
@@ -29,7 +29,7 @@ namespace NeteaseCassette
         private static List<NcPlaylist> playlists = new List<NcPlaylist>();
         private static NcPlaylist currentPlaylist;
 
-        // ---------------------------------------------------------------- 窗口
+        // 窗口
 
         public static void Open()
         {
@@ -75,14 +75,13 @@ namespace NeteaseCassette
                 .SetCloseOnEscape(true)
                 .Center();
 
-            builder.AddHeader("网易云音乐");
             builder.AddLabel(AccountLine(), AccountId);
             builder.AddLabel(" ", MainStatusId);
             builder.AddSpace(6f);
 
             builder.BeginTabs();
 
-            // ---------------- 扫码
+            // 扫码
             builder.BeginTab("扫码登录");
             builder.AddLabel(
                 loggedIn
@@ -105,7 +104,7 @@ namespace NeteaseCassette
             builder.End();
             builder.End();
 
-            // ---------------- 搜索
+            // 搜索
             builder.BeginTab("搜索");
             builder.BeginRow();
             builder.AddInput("输入歌名 / 歌手，回车搜索", lastKeyword, value => lastKeyword = value);
@@ -118,7 +117,7 @@ namespace NeteaseCassette
             builder.End();
             builder.End();
 
-            // ---------------- 歌单
+            // 歌单
             builder.BeginTab("歌单");
             builder.AddLabel(loggedIn ? "点开歌单，再点曲目。" : "扫码登录后才能读你的歌单。", PlaylistStatusId);
             builder.BeginScrollFlexible(420f);
@@ -138,7 +137,7 @@ namespace NeteaseCassette
 
             builder.Show();
 
-            // 没登录才需要二维码；已登录就把图片控件收起来，不然会露出预制体自带的占位图
+            // 没登录才显示二维码。已登录还留着图片控件的话，会露出预制体自带的占位图
             SetVisible(QrElementId, false);
 
             FillSearch();
@@ -164,7 +163,7 @@ namespace NeteaseCassette
             return "已登录：" + name;
         }
 
-        // ---------------------------------------------------------------- 控件小工具
+        // 控件小工具
 
         private static void SetText(string elementId, string text)
         {
@@ -216,8 +215,8 @@ namespace NeteaseCassette
             SetText(MainStatusId, message ?? string.Empty);
         }
 
-        /// <summary>歌名里常见的 emoji / 变体选择符在游戏字体里是方块，显示前清掉。</summary>
-        private static string Clean(string text)
+        // 歌名里的 emoji、变体选择符在游戏字体里是方块，显示前清掉
+        internal static string Clean(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
             var builder = new System.Text.StringBuilder(text.Length);
@@ -238,7 +237,7 @@ namespace NeteaseCassette
             return builder.ToString();
         }
 
-        // ---------------------------------------------------------------- 扫码
+        // 扫码流程
 
         private static void RefreshQr()
         {
@@ -344,7 +343,7 @@ namespace NeteaseCassette
             FillPlaylistMessage("未登录。");
         }
 
-        // ---------------------------------------------------------------- 搜索
+        // 搜索
 
         private static void StartSearch(string keyword)
         {
@@ -393,18 +392,11 @@ namespace NeteaseCassette
                     {
                         if (shown >= MaxListRows) break;
                         shown++;
-                        var song = item;
-                        string label = Clean(song.Display);
-                        if (song.DurationMs > 0)
-                        {
-                            label += "  [" + (song.DurationMs / 60000).ToString("0") + ":" +
-                                     ((song.DurationMs / 1000) % 60).ToString("00") + "]";
-                        }
-                        builder.AddButton(label, () => PlaySong(song));
+                        AddSongRow(builder, item, shown);
                     }
                     if (searchSongs.Count > shown)
                     {
-                        builder.AddLabel("……还有 " + (searchSongs.Count - shown) + " 首没列出来");
+                        builder.AddLabel("……还有 " + (searchSongs.Count - shown) + " 首没列出来，换个关键词再搜。");
                     }
                 }
                 CustomUIBuilder.RebuildLayout(searchHost);
@@ -415,7 +407,7 @@ namespace NeteaseCassette
             }
         }
 
-        // ---------------------------------------------------------------- 歌单
+        // 歌单
 
         private static void LoadPlaylists()
         {
@@ -449,23 +441,22 @@ namespace NeteaseCassette
                 var builder = new CustomUIBuilder(CustomUIManager.Instance, window, playlistHost);
                 if (currentPlaylist != null)
                 {
-                    builder.AddButton("← 返回歌单列表", () =>
+                    builder.AddButton("返回歌单列表", () =>
                     {
                         currentPlaylist = null;
                         FillPlaylists();
                     });
-                    builder.AddHeader(Clean(currentPlaylist.Display));
+                    builder.AddLabel("《" + Fit(Clean(currentPlaylist.Name), 44) + "》  " + playlistSongs.Count + " 首");
                     int shown = 0;
                     foreach (var item in playlistSongs)
                     {
                         if (shown >= MaxListRows) break;
                         shown++;
-                        var song = item;
-                        builder.AddButton(Clean(song.Display), () => PlaySong(song));
+                        AddSongRow(builder, item, shown);
                     }
                     if (playlistSongs.Count > shown)
                     {
-                        builder.AddButton("……还有 " + (playlistSongs.Count - shown) + " 首没列出来", () => { });
+                        builder.AddLabel("……还有 " + (playlistSongs.Count - shown) + " 首没列出来");
                     }
                 }
                 else
@@ -477,7 +468,9 @@ namespace NeteaseCassette
                     foreach (var item in playlists)
                     {
                         var playlist = item;
-                        builder.AddButton(Clean(playlist.Display), () => OpenPlaylist(playlist));
+                        string label = (playlist.IsLiked ? "♥ " : "") + Clean(playlist.Name) + "   (" + playlist.TrackCount + " 首)";
+                        builder.AddButton(Fit(label, 62), () => OpenPlaylist(playlist));
+                        builder.WithTooltip(Clean(playlist.Name) + "（" + playlist.TrackCount + " 首）");
                     }
                 }
                 CustomUIBuilder.RebuildLayout(playlistHost);
@@ -528,7 +521,7 @@ namespace NeteaseCassette
             FillPlaylists();
         }
 
-        // ---------------------------------------------------------------- 点歌
+        // 点歌
 
         private static void PlaySong(NcSong song)
         {
@@ -566,8 +559,8 @@ namespace NeteaseCassette
                     ShowStatus("生成磁带失败，看日志");
                     return;
                 }
-                // 注意：GraphUtils.TryAcceptAll 返回的是「没塞进去的数量」，不是塞进去的数量，
-                // 所以这里不看返回值，只看物品最后挂在哪个容器里。
+                // TryAcceptAll 返回的是「没塞进去的数量」，不是塞进去的数量，别拿它判断成败。
+                // 这里只看物品最后挂在哪个容器里。
                 GraphUtils.TryAcceptAll(deck, cassette);
                 if (cassette.parentInventory != deck)
                 {
@@ -608,13 +601,14 @@ namespace NeteaseCassette
             }
 
             StartTrack(machine, deck, trackId, index);
+            SetText(NowPlayingId, "▶ " + Clean(song.Display));
             ShowStatus("正在播放：" + Clean(song.Display));
         }
 
         private static GameItem CreateCassette(NcSong song, string trackId)
         {
-            // 必须走目录生成：identifier / identifierName / uniqueId 都要有，
-            // 否则提示框和点击会空引用，存档也还原不了这盘磁带。
+            // 走目录生成，identifier 和 uniqueId 才有。自己 new 的话提示框、
+            // 点击都会空引用，存档也认不回来。
             var cassette = ModHelper.SpawnItem(ModEntry.TapeItemId);
             if (cassette == null)
             {
@@ -658,7 +652,7 @@ namespace NeteaseCassette
             }
         }
 
-        /// <summary>窗口里那个「停止」：云曲目和原版播放器一起收掉，状态回到停止。</summary>
+        // 窗口里的「停止」：云曲目和原版播放器一起收掉
         private static void StopPlayback()
         {
             try
@@ -694,9 +688,9 @@ namespace NeteaseCassette
             }
         }
 
-        // ---------------------------------------------------------------- 磁带机面板
+        // 磁带机面板
 
-        /// <summary>在原版磁带机窗口右侧加一块「网易云」面板（Harmony Postfix 调用）。</summary>
+        // 给原版磁带机窗口加按钮，Harmony Postfix 里调
         public static void AddCloudPanel(GameItem machine)
         {
             if (machine == null || machine.contentWindow == null)
@@ -717,15 +711,23 @@ namespace NeteaseCassette
             var button = new MachineryButton("云", Open);
             button.SetDescription("扫码登录网易云，点歌变成磁带，用这台机器播放");
 
+            var lyricButton = new MachineryButton("词", Lyrics.Toggle);
+            lyricButton.SetDescription("开关桌面歌词");
+
+            var lyricSetButton = new MachineryButton("设", LyricPanel.Open);
+            lyricSetButton.SetDescription("歌词的字号、颜色和位置");
+
             var controls = row.GetPanel("controls");
             var stack = controls != null ? controls.content as MachineryStack : null;
             if (stack != null)
             {
                 stack.Add(button);
+                stack.Add(lyricButton);
+                stack.Add(lyricSetButton);
             }
             else
             {
-                var panel = new MachineryPanel("网易云", MachineryStack.Horizontal(button), "cloud");
+                var panel = new MachineryPanel("网易云", MachineryStack.Horizontal(button, lyricButton, lyricSetButton), "cloud");
                 row.Add(panel);
                 controls = panel;
             }
@@ -742,6 +744,53 @@ namespace NeteaseCassette
                 ModEntry.Log?.Warning("磁带机窗口重新排版失败：" + e.Message);
             }
             ModEntry.Log?.Log("磁带机加上了网易云按钮");
+        }
+
+        // 列表行
+
+        private static void AddSongRow(CustomUIBuilder builder, NcSong song, int index)
+        {
+            if (song == null) return;
+            string name = Clean(song.Name);
+            string artists = Clean(song.Artists);
+            string label = index.ToString("00") + "  " + name;
+            if (!string.IsNullOrEmpty(artists))
+            {
+                label += " — " + artists;
+            }
+            if (song.DurationMs > 0)
+            {
+                label += "   " + Duration(song.DurationMs);
+            }
+            builder.AddButton(Fit(label, 74), () => PlaySong(song));
+            builder.WithTooltip(Clean(song.Display) + (song.DurationMs > 0 ? "  " + Duration(song.DurationMs) : ""));
+        }
+
+        private static string Duration(int milliseconds)
+        {
+            int totalSeconds = milliseconds / 1000;
+            return (totalSeconds / 60).ToString("0") + ":" + (totalSeconds % 60).ToString("00");
+        }
+
+        // 按显示宽度截断（中文算 2 格），超长补省略号，免得按钮里被硬切
+        private static string Fit(string text, int maxUnits)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            int units = 0;
+            var builder = new System.Text.StringBuilder(text.Length);
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                int width = c >= 0x1100 ? 2 : 1;
+                if (units + width > maxUnits)
+                {
+                    builder.Append('…');
+                    break;
+                }
+                builder.Append(c);
+                units += width;
+            }
+            return builder.ToString();
         }
     }
 }

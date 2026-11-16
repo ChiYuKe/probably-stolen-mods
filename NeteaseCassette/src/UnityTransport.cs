@@ -5,10 +5,8 @@ using UnityEngine.Networking;
 
 namespace NeteaseCassette
 {
-    /// <summary>
-    /// 把 NeteaseClient 的表单请求落到 UnityWebRequest 上。
-    /// 客户端负责填好 Headers（UA / Referer / Origin / Cookie），这里只负责发出去。
-    /// </summary>
+    // NeteaseClient 的表单请求 -> UnityWebRequest。
+    // 请求头客户端自己填好，这里只管发。
     public class UnityTransport : INcTransport
     {
         public const string UserAgent =
@@ -92,7 +90,7 @@ namespace NeteaseCassette
             var values = new List<string>();
             foreach (var kv in headers)
             {
-                // Unity 的响应头字典键大小写跟服务器走，而且同名头可能被合并成一个值，这里全都收走
+                // 响应头的键大小写看服务器，同名头还可能被合并，干脆全收
                 if (string.Equals(kv.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(kv.Value))
                 {
                     values.Add(kv.Value);
