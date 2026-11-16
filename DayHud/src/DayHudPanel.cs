@@ -28,6 +28,9 @@ namespace DayHud
         private const string RetroMaskKey = "retro_dial_mask";
         private const string MoneyTextureKey = "money_bar";
         private const string MoneyMaskKey = "money_bar_mask";
+        private const string CalendarTextureKey = "calendar_panel";
+        // 游戏日历窗口原背景就叫这个名字，找不到时用它兜底定位
+        private const string CalendarBackgroundSpriteName = "calendar_stripped";
 
         private static readonly string[] WeekdayKeys =
         {
@@ -77,6 +80,9 @@ namespace DayHud
             public float Age;
             public float Duration;
             public bool Hovered;
+            public bool IsPermanent;
+            public RectTransform CloseRect;
+            public TextMeshProUGUI CloseText;
         }
 
         private static Sprite fallbackSprite;
@@ -106,11 +112,16 @@ namespace DayHud
         private bool moneyReady;
         private bool moneyHovering;
 
-        private const int MaxNotifications = 5;
-        private const float NotificationRowHeight = 27f;
-        private const float NotificationGap = 4f;
+        private const int VisibleNotifications = 5;
+        private const int MaxStoredNotifications = 18;
+        private const float NotificationRowHeight = 38f;
+        private const float NotificationGap = 5f;
+        private const float NotificationWidth = 230f;
         private RectTransform notificationRoot;
         private readonly List<NotificationItem> notifications = new List<NotificationItem>();
+        private NotificationItem hoveredNotice;
+        private NotificationItem collapseRow;
+        private bool notificationsExpanded;
         private bool notificationsInitialized;
         private float nextMachinePoll;
         private bool machineScanLogged;
@@ -134,6 +145,16 @@ namespace DayHud
         private bool creditHidden;
         private readonly List<HiddenObject> hiddenCreditObjects = new List<HiddenObject>();
         private bool hideOutsideStore = true;
+        private bool calendarSkin = true;
+        private bool calendarTrimEdges = true;
+        private bool calendarSpriteDirty;
+        private Sprite calendarPanelSprite;
+        private Image calendarPanelImage;
+        private GameObject calendarPanelOwner;
+        private Sprite calendarPanelOriginalSprite;
+        private Image.Type calendarPanelOriginalType = Image.Type.Simple;
+        private Color calendarPanelOriginalColor = Color.white;
+        private bool calendarSkinLogged;
         private bool rentVisible;
         private bool rentDirty = true;
         private int rentDays = -1;
@@ -191,7 +212,7 @@ namespace DayHud
                 canvas.enabled = !userHidden && ShouldShow();
             }
 
-            log.Log(userHidden ? "天数圆盘：关" : "天数圆盘：开");
+            log.Log(userHidden ? "当铺 HUD：关" : "当铺 HUD：开");
         }
 
         /// <summary>
@@ -238,6 +259,240 @@ namespace DayHud
         public void SetHideOutsideStore(bool hide)
         {
             hideOutsideStore = hide;
+        }
+
+        /// <summary>
+        /// 模组配置：打开日历时，把游戏日历窗口的底图换成模组自带的复古工业面板。默认开。
+        /// </summary>
+        public void SetCalendarSkin(bool enabled)
+        {
+            if (calendarSkin == enabled)
+            {
+                return;
+            }
+
+            calendarSkin = enabled;
+
+            if (!enabled)
+            {
+                RestoreCalendarSkin();
+            }
+        }
+
+        /// <summary>
+        /// 模组配置：是否把日历底图四周的透明外边裁掉再铺满窗口。默认裁。
+        /// </summary>
+        public void SetCalendarTrimEdges(bool trim)
+        {
+            if (calendarTrimEdges == trim)
+            {
+                return;
+            }
+
+            calendarTrimEdges = trim;
+            calendarSpriteDirty = true;
+        }
+
+        /// <summary>
+        /// 每帧看一眼日历窗口在不在：先记下游戏原本的底图，再换成 mod 的贴图。
+        /// 换场景后日历窗口会重建，缓存失效了自然会在下一帧重新接管。
+        /// </summary>
+        private void RefreshCalendarSkin()
+        {
+            if (!calendarSkin)
+            {
+                return;
+            }
+
+            AdvCalendarUIManager calendar = AdvCalendarUIManager.Instance;
+            if (calendar == null || calendar.UIPanel == null)
+            {
+                return;
+            }
+
+            if (calendarPanelImage == null || calendarPanelOwner != calendar.UIPanel)
+            {
+                Image image = FindCalendarBackground(calendar.UIPanel);
+                if (image == null)
+                {
+                    return;
+                }
+
+                calendarPanelImage = image;
+                calendarPanelOwner = calendar.UIPanel;
+                calendarPanelOriginalSprite = image.sprite;
+                calendarPanelOriginalType = image.type;
+                calendarPanelOriginalColor = image.color;
+            }
+
+            if (calendarPanelSprite == null || calendarSpriteDirty)
+            {
+                Sprite fresh = BuildCalendarPanelSprite();
+                if (fresh == null)
+                {
+                    return;
+                }
+
+                Sprite stale = calendarPanelSprite;
+                calendarPanelSprite = fresh;
+                calendarSpriteDirty = false;
+
+                if (stale != null)
+                {
+                    Destroy(stale);
+                }
+            }
+
+            if (calendarPanelImage.sprite == calendarPanelSprite &&
+                calendarPanelImage.type == Image.Type.Simple &&
+                calendarPanelImage.color == Color.white)
+            {
+                return;
+            }
+
+            calendarPanelImage.sprite = calendarPanelSprite;
+            calendarPanelImage.type = Image.Type.Simple;
+            calendarPanelImage.preserveAspect = false;
+            calendarPanelImage.color = Color.white;
+
+            if (!calendarSkinLogged)
+            {
+                calendarSkinLogged = true;
+                log.Log("日历窗口底图已换成复古工业面板");
+            }
+        }
+
+        private void RestoreCalendarSkin()
+        {
+            if (calendarPanelImage != null)
+            {
+                calendarPanelImage.sprite = calendarPanelOriginalSprite;
+                calendarPanelImage.type = calendarPanelOriginalType;
+                calendarPanelImage.color = calendarPanelOriginalColor;
+            }
+
+            calendarPanelImage = null;
+            calendarPanelOwner = null;
+            calendarPanelOriginalSprite = null;
+            calendarSkinLogged = false;
+        }
+
+        private static Image FindCalendarBackground(GameObject panel)
+        {
+            if (panel == null)
+            {
+                return null;
+            }
+
+            Image direct = panel.GetComponent<Image>();
+            if (direct != null)
+            {
+                return direct;
+            }
+
+            // 万一以后游戏把底图挪到子节点上，就按原贴图名字找
+            foreach (Image image in panel.GetComponentsInChildren<Image>(true))
+            {
+                if (image != null && image.sprite != null &&
+                    image.sprite.name == CalendarBackgroundSpriteName)
+                {
+                    return image;
+                }
+            }
+
+            return null;
+        }
+
+        private Sprite BuildCalendarPanelSprite()
+        {
+            Texture2D texture = FindModTexture(CalendarTextureKey);
+            if (texture == null)
+            {
+                return null;
+            }
+
+            // 图2自带一圈透明外边（阴影），直接铺满窗口的话边缘会漏出游戏场景；
+            // 默认按不透明区域裁一刀，再让它铺满窗口；配置里可以关掉裁切。
+            Rect rect = calendarTrimEdges
+                ? GetOpaqueTextureRect(texture)
+                : new Rect(0f, 0f, texture.width, texture.height);
+            Sprite sprite = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), 100f, 0,
+                SpriteMeshType.FullRect);
+            sprite.name = "DayHudCalendarPanel";
+            return sprite;
+        }
+
+        private static Rect GetOpaqueTextureRect(Texture2D texture)
+        {
+            if (texture == null || texture.width <= 0 || texture.height <= 0)
+            {
+                return new Rect(0f, 0f, 0f, 0f);
+            }
+
+            Rect full = new Rect(0f, 0f, texture.width, texture.height);
+
+            Color32[] pixels;
+            try
+            {
+                pixels = texture.GetPixels32();
+            }
+            catch
+            {
+                // 贴图不可读就用整张，至少不会崩
+                return full;
+            }
+
+            if (pixels == null || pixels.Length < texture.width * texture.height)
+            {
+                return full;
+            }
+
+            const byte threshold = 8;
+            int width = texture.width;
+            int height = texture.height;
+            int minX = width;
+            int minY = height;
+            int maxX = -1;
+            int maxY = -1;
+
+            for (int y = 0; y < height; y++)
+            {
+                int row = y * width;
+                for (int x = 0; x < width; x++)
+                {
+                    if (pixels[row + x].a <= threshold)
+                    {
+                        continue;
+                    }
+
+                    if (x < minX)
+                    {
+                        minX = x;
+                    }
+
+                    if (x > maxX)
+                    {
+                        maxX = x;
+                    }
+
+                    if (y < minY)
+                    {
+                        minY = y;
+                    }
+
+                    if (y > maxY)
+                    {
+                        maxY = y;
+                    }
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+            {
+                return full;
+            }
+
+            return new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
         }
 
         private void BuildDial()
@@ -600,8 +855,8 @@ namespace DayHud
             notificationRoot.anchorMin = new Vector2(0f, 1f);
             notificationRoot.anchorMax = new Vector2(0f, 1f);
             notificationRoot.pivot = new Vector2(0f, 1f);
-            notificationRoot.sizeDelta = new Vector2(panelWidth,
-                MaxNotifications * (NotificationRowHeight + NotificationGap) - NotificationGap);
+            notificationRoot.sizeDelta = new Vector2(NotificationWidth,
+                (MaxStoredNotifications + 1) * (NotificationRowHeight + NotificationGap) - NotificationGap);
             notificationRoot.gameObject.SetActive(false);
         }
 
@@ -630,7 +885,7 @@ namespace DayHud
             NotificationItem item = CreateNotificationItem(message, tone, duration, onClick);
             notifications.Insert(0, item);
 
-            while (notifications.Count > MaxNotifications)
+            while (notifications.Count > MaxStoredNotifications)
             {
                 RemoveNotificationAt(notifications.Count - 1);
             }
@@ -639,28 +894,39 @@ namespace DayHud
             notificationRoot.gameObject.SetActive(true);
         }
 
+        /// <summary>
+        /// 永久通知：不会自动过期，需要点右侧的 × 才会消失。
+        /// </summary>
+        public void NotifyPersistent(string message, NoticeTone tone = NoticeTone.Info,
+            Action onClick = null, bool allowDuplicate = false)
+        {
+            Notify(message, tone, 0f, onClick, allowDuplicate);
+        }
+
         private NotificationItem CreateNotificationItem(string message, NoticeTone tone, float duration,
             Action onClick)
         {
+            bool permanent = duration <= 0f;
+
             GameObject rowObject = new GameObject("Notice", typeof(RectTransform), typeof(CanvasGroup));
             RectTransform rect = (RectTransform)rowObject.transform;
             rect.SetParent(notificationRoot, false);
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(0f, 1f);
             rect.pivot = new Vector2(0f, 1f);
-            rect.sizeDelta = new Vector2(panelWidth, NotificationRowHeight);
+            rect.sizeDelta = new Vector2(NotificationWidth, NotificationRowHeight);
 
             CanvasGroup group = rowObject.GetComponent<CanvasGroup>();
-            group.alpha = 0f;
+            group.alpha = permanent ? 1f : 0f;
             group.blocksRaycasts = false;
             group.interactable = false;
 
-            Image border = CreateStretchImage(rect, "Border", new Color32(120, 100, 80, 80));
+            Image border = CreateStretchImage(rect, "Border", new Color32(120, 100, 80, 100));
             RectTransform borderRect = border.rectTransform;
             borderRect.offsetMin = new Vector2(-1f, -1f);
             borderRect.offsetMax = new Vector2(1f, 1f);
 
-            Image background = CreateStretchImage(rect, "BG", new Color32(31, 24, 37, 232));
+            Image background = CreateStretchImage(rect, "BG", new Color32(28, 21, 34, 242));
 
             Image accent = CreateStretchImage(rect, "Accent", ToneColor(tone));
             RectTransform accentRect = accent.rectTransform;
@@ -668,15 +934,15 @@ namespace DayHud
             accentRect.anchorMax = new Vector2(0f, 1f);
             accentRect.pivot = new Vector2(0f, 0.5f);
             accentRect.offsetMin = new Vector2(0f, 3f);
-            accentRect.offsetMax = new Vector2(3f, -3f);
+            accentRect.offsetMax = new Vector2(4f, -3f);
 
             GameObject textObject = new GameObject("Text", typeof(RectTransform));
             RectTransform textRect = (RectTransform)textObject.transform;
             textRect.SetParent(rect, false);
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(10f, 1f);
-            textRect.offsetMax = new Vector2(-18f, -1f);
+            textRect.offsetMin = new Vector2(10f, 2f);
+            textRect.offsetMax = new Vector2(permanent ? -30f : -20f, -2f);
 
             TextMeshProUGUI text = textObject.AddComponent<TextMeshProUGUI>();
             TMP_FontAsset font = noteFont != null ? noteFont : ResolveFont();
@@ -686,18 +952,18 @@ namespace DayHud
             }
 
             text.fontStyle = noteStyle;
-            text.fontSize = 11f;
+            text.fontSize = 15f;
             text.enableAutoSizing = true;
-            text.fontSizeMax = 11f;
-            text.fontSizeMin = 8f;
+            text.fontSizeMax = 15f;
+            text.fontSizeMin = 11f;
             text.alignment = TextAlignmentOptions.MidlineLeft;
-            text.color = new Color32(222, 210, 184, 255);
+            text.color = new Color32(235, 225, 205, 255);
             text.enableWordWrapping = false;
             text.overflowMode = TextOverflowModes.Ellipsis;
             text.raycastTarget = false;
             text.text = message;
 
-            if (onClick != null)
+            if (onClick != null && !permanent)
             {
                 GameObject chevronObject = new GameObject("Chevron", typeof(RectTransform));
                 RectTransform chevronRect = (RectTransform)chevronObject.transform;
@@ -705,7 +971,7 @@ namespace DayHud
                 chevronRect.anchorMin = new Vector2(1f, 0f);
                 chevronRect.anchorMax = new Vector2(1f, 1f);
                 chevronRect.pivot = new Vector2(1f, 0.5f);
-                chevronRect.sizeDelta = new Vector2(14f, 0f);
+                chevronRect.sizeDelta = new Vector2(16f, 0f);
                 chevronRect.anchoredPosition = new Vector2(-4f, 0f);
 
                 TextMeshProUGUI chevron = chevronObject.AddComponent<TextMeshProUGUI>();
@@ -715,12 +981,40 @@ namespace DayHud
                 }
 
                 chevron.fontStyle = FontStyles.Normal;
-                chevron.fontSize = 13f;
+                chevron.fontSize = 16f;
                 chevron.enableAutoSizing = false;
                 chevron.alignment = TextAlignmentOptions.Center;
-                chevron.color = new Color32(160, 148, 126, 255);
+                chevron.color = new Color32(196, 180, 150, 255);
                 chevron.raycastTarget = false;
                 chevron.text = "›";
+            }
+
+            RectTransform closeRect = null;
+            TextMeshProUGUI closeText = null;
+            if (permanent)
+            {
+                GameObject closeObject = new GameObject("Close", typeof(RectTransform));
+                closeRect = (RectTransform)closeObject.transform;
+                closeRect.SetParent(rect, false);
+                closeRect.anchorMin = new Vector2(1f, 0f);
+                closeRect.anchorMax = new Vector2(1f, 1f);
+                closeRect.pivot = new Vector2(1f, 0.5f);
+                closeRect.sizeDelta = new Vector2(20f, 0f);
+                closeRect.anchoredPosition = new Vector2(-5f, 0f);
+
+                closeText = closeObject.AddComponent<TextMeshProUGUI>();
+                if (font != null)
+                {
+                    closeText.font = font;
+                }
+
+                closeText.fontStyle = FontStyles.Normal;
+                closeText.fontSize = 18f;
+                closeText.enableAutoSizing = false;
+                closeText.alignment = TextAlignmentOptions.Center;
+                closeText.color = new Color32(206, 150, 130, 255);
+                closeText.raycastTarget = false;
+                closeText.text = "×";
             }
 
             return new NotificationItem
@@ -729,11 +1023,14 @@ namespace DayHud
                 Group = group,
                 Text = text,
                 Background = background,
-                BaseColor = new Color32(31, 24, 37, 232),
+                BaseColor = new Color32(28, 21, 34, 242),
                 OnClick = onClick,
                 Message = message,
                 Age = 0f,
-                Duration = duration
+                Duration = duration,
+                IsPermanent = permanent,
+                CloseRect = closeRect,
+                CloseText = closeText
             };
         }
 
@@ -773,20 +1070,168 @@ namespace DayHud
         {
             if (notificationRoot != null)
             {
-                notificationRoot.sizeDelta = new Vector2(panelWidth,
-                    MaxNotifications * (NotificationRowHeight + NotificationGap) - NotificationGap);
+                notificationRoot.sizeDelta = new Vector2(NotificationWidth,
+                    (MaxStoredNotifications + 1) * (NotificationRowHeight + NotificationGap) - NotificationGap);
             }
+
+            int shown = notificationsExpanded
+                ? notifications.Count
+                : Mathf.Min(notifications.Count, VisibleNotifications);
 
             for (int i = 0; i < notifications.Count; i++)
             {
-                notifications[i].Rect.sizeDelta = new Vector2(panelWidth, NotificationRowHeight);
-                notifications[i].Rect.anchoredPosition =
-                    new Vector2(0f, -i * (NotificationRowHeight + NotificationGap));
+                NotificationItem item = notifications[i];
+                bool show = i < shown;
+                item.Rect.gameObject.SetActive(show);
+
+                if (show)
+                {
+                    item.Rect.sizeDelta = new Vector2(NotificationWidth, NotificationRowHeight);
+                    item.Rect.anchoredPosition =
+                        new Vector2(0f, -i * (NotificationRowHeight + NotificationGap));
+                }
+                else
+                {
+                    item.Hovered = false;
+                    if (hoveredNotice == item)
+                    {
+                        HideNotificationTooltip();
+                    }
+                }
+            }
+
+            bool hasMore = notifications.Count > VisibleNotifications;
+            if (hasMore)
+            {
+                EnsureCollapseRow();
+                collapseRow.Rect.gameObject.SetActive(true);
+                collapseRow.Rect.sizeDelta = new Vector2(NotificationWidth, NotificationRowHeight);
+                collapseRow.Rect.anchoredPosition =
+                    new Vector2(0f, -shown * (NotificationRowHeight + NotificationGap));
+
+                string text = notificationsExpanded
+                    ? Loc("notify_collapse", "收起通知", "Collapse")
+                    : string.Format(
+                        Loc("notify_folded", "已折叠通知（{0}）", "{0} more notifications"),
+                        notifications.Count - shown);
+
+                collapseRow.Message = text;
+                collapseRow.Text.text = text;
+                collapseRow.Group.alpha = 1f;
+            }
+            else if (collapseRow != null)
+            {
+                collapseRow.Rect.gameObject.SetActive(false);
+                collapseRow.Hovered = false;
+                if (hoveredNotice == collapseRow)
+                {
+                    HideNotificationTooltip();
+                }
             }
 
             if (notificationRoot != null)
             {
                 notificationRoot.gameObject.SetActive(notifications.Count > 0);
+            }
+        }
+
+        private void EnsureCollapseRow()
+        {
+            if (collapseRow != null)
+            {
+                return;
+            }
+
+            collapseRow = CreateNotificationItem(string.Empty, NoticeTone.Muted, float.MaxValue,
+                ToggleNotificationsExpanded);
+            collapseRow.Text.alignment = TextAlignmentOptions.Center;
+            collapseRow.Text.fontSize = 13f;
+            collapseRow.Text.fontSizeMax = 13f;
+            collapseRow.Text.fontSizeMin = 11f;
+            collapseRow.Text.color = new Color32(196, 180, 150, 255);
+            collapseRow.Background.color = new Color32(24, 18, 30, 242);
+            collapseRow.BaseColor = new Color32(24, 18, 30, 242);
+            collapseRow.Group.alpha = 1f;
+        }
+
+        private void ToggleNotificationsExpanded()
+        {
+            notificationsExpanded = !notificationsExpanded;
+
+            if (notificationsExpanded)
+            {
+                foreach (NotificationItem item in notifications)
+                {
+                    item.Age = 0f;
+                    item.Group.alpha = 1f;
+                }
+            }
+
+            HideNotificationTooltip();
+            LayoutNotifications();
+        }
+
+        private void ShowNotificationTooltip(NotificationItem item, bool footer = false)
+        {
+            if (item == null || TooltipManager._instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string text = item.Message;
+
+                if (footer)
+                {
+                    string hint = notificationsExpanded
+                        ? Loc("notify_collapse_hint", "点击收起通知", "Click to collapse")
+                        : Loc("notify_expand_hint", "点击展开全部通知", "Click to expand all");
+                    if (!string.IsNullOrEmpty(hint))
+                    {
+                        text = text + "\n" + hint;
+                    }
+                }
+                else if (item.OnClick != null)
+                {
+                    string hint = Loc("notify_click_focus", "点击聚焦", "Click to focus");
+                    if (!string.IsNullOrEmpty(hint))
+                    {
+                        text = text + "\n" + hint;
+                    }
+                }
+
+                if (item.IsPermanent)
+                {
+                    string dismiss = Loc("notify_dismiss_hint", "点 × 关闭", "Click × to dismiss");
+                    if (!string.IsNullOrEmpty(dismiss))
+                    {
+                        text = text + "\n" + dismiss;
+                    }
+                }
+
+                hoveredNotice = item;
+                TooltipManager._instance.SetAndShowTooltip(text, this);
+            }
+            catch (Exception e)
+            {
+                log.Warning("显示通知提示失败：" + e.Message);
+            }
+        }
+
+        private void HideNotificationTooltip()
+        {
+            hoveredNotice = null;
+
+            // 指针已经移到表盘或货币条上的话，让它们自己的提示保持显示
+            if (hovering || moneyHovering)
+            {
+                return;
+            }
+
+            if (TooltipManager._instance != null)
+            {
+                TooltipManager._instance.HideTooltip(this);
             }
         }
 
@@ -799,6 +1244,11 @@ namespace DayHud
 
             NotificationItem item = notifications[index];
             notifications.RemoveAt(index);
+            if (hoveredNotice == item)
+            {
+                HideNotificationTooltip();
+            }
+
             if (item.Rect != null)
             {
                 UnityEngine.Object.Destroy(item.Rect.gameObject);
@@ -807,11 +1257,24 @@ namespace DayHud
 
         private void ClearNotifications()
         {
+            HideNotificationTooltip();
+
             for (int i = notifications.Count - 1; i >= 0; i--)
             {
                 RemoveNotificationAt(i);
             }
 
+            if (collapseRow != null)
+            {
+                if (collapseRow.Rect != null)
+                {
+                    UnityEngine.Object.Destroy(collapseRow.Rect.gameObject);
+                }
+
+                collapseRow = null;
+            }
+
+            notificationsExpanded = false;
             notificationsInitialized = false;
             nextMachinePoll = 0f;
             machineScanLogged = false;
@@ -833,35 +1296,84 @@ namespace DayHud
             Vector2 mouse = (Vector2)Input.mousePosition;
             bool clicked = Input.GetMouseButtonDown(0);
 
+            AdvCalendarUIManager calendar = AdvCalendarUIManager.Instance;
+            bool modalOpen = calendar != null && calendar.UIPanel != null && calendar.UIPanel.activeSelf;
+
+            int shown = notificationsExpanded
+                ? notifications.Count
+                : Mathf.Min(notifications.Count, VisibleNotifications);
+
             for (int i = notifications.Count - 1; i >= 0; i--)
             {
+                if (i >= shown)
+                {
+                    continue;
+                }
+
                 NotificationItem item = notifications[i];
-                item.Age += dt;
 
-                float fadeIn = Mathf.Clamp01(item.Age / 0.15f);
-                float fadeOut = Mathf.Clamp01((item.Duration - item.Age) / 0.4f);
-                item.Group.alpha = fadeIn * fadeOut;
+                if (item.IsPermanent)
+                {
+                    item.Group.alpha = 1f;
+                }
+                else
+                {
+                    item.Age += dt;
 
-                bool over = item.OnClick != null &&
+                    float fadeIn = Mathf.Clamp01(item.Age / 0.15f);
+                    float fadeOut = Mathf.Clamp01((item.Duration - item.Age) / 0.4f);
+                    item.Group.alpha = fadeIn * fadeOut;
+                }
+
+                bool over = !modalOpen &&
                             RectTransformUtility.RectangleContainsScreenPoint(item.Rect, mouse, null);
+
+                bool closeOver = item.CloseRect != null && !modalOpen &&
+                                 RectTransformUtility.RectangleContainsScreenPoint(
+                                     item.CloseRect, mouse, null);
+
+                if (item.CloseText != null)
+                {
+                    item.CloseText.color = closeOver
+                        ? new Color32(238, 120, 100, 255)
+                        : new Color32(206, 150, 130, 255);
+                }
+
+                if (closeOver && clicked)
+                {
+                    HideNotificationTooltip();
+                    RemoveNotificationAt(i);
+                    continue;
+                }
+
                 if (over != item.Hovered)
                 {
                     item.Hovered = over;
                     if (item.Background != null)
                     {
                         item.Background.color = over
-                            ? new Color32(46, 36, 54, 242)
+                            ? new Color32(52, 41, 60, 248)
                             : item.BaseColor;
+                    }
+
+                    if (over)
+                    {
+                        ShowNotificationTooltip(item);
+                    }
+                    else if (hoveredNotice == item)
+                    {
+                        HideNotificationTooltip();
                     }
                 }
 
-                if (over && clicked)
+                if (over && clicked && item.OnClick != null)
                 {
                     Action callback = item.OnClick;
+                    HideNotificationTooltip();
                     RemoveNotificationAt(i);
                     try
                     {
-                        callback?.Invoke();
+                        callback.Invoke();
                     }
                     catch (Exception e)
                     {
@@ -871,13 +1383,46 @@ namespace DayHud
                     continue;
                 }
 
-                if (item.Age >= item.Duration)
+                if (!item.IsPermanent && item.Age >= item.Duration)
                 {
                     RemoveNotificationAt(i);
                 }
             }
 
             LayoutNotifications();
+
+            if (collapseRow != null && collapseRow.Rect.gameObject.activeSelf)
+            {
+                bool overFooter = !modalOpen &&
+                                  RectTransformUtility.RectangleContainsScreenPoint(
+                                      collapseRow.Rect, mouse, null);
+
+                if (overFooter != collapseRow.Hovered)
+                {
+                    collapseRow.Hovered = overFooter;
+                    if (collapseRow.Background != null)
+                    {
+                        collapseRow.Background.color = overFooter
+                            ? new Color32(46, 36, 54, 248)
+                            : collapseRow.BaseColor;
+                    }
+
+                    if (overFooter)
+                    {
+                        ShowNotificationTooltip(collapseRow, true);
+                    }
+                    else if (hoveredNotice == collapseRow)
+                    {
+                        HideNotificationTooltip();
+                    }
+                }
+
+                if (overFooter && clicked)
+                {
+                    HideNotificationTooltip();
+                    ToggleNotificationsExpanded();
+                }
+            }
 
             if (!notificationsInitialized)
             {
@@ -1080,6 +1625,8 @@ namespace DayHud
                 return;
             }
 
+            RefreshCalendarSkin();
+
             bool visible = !userHidden && ShouldShow();
             if (canvas.enabled != visible)
             {
@@ -1190,6 +1737,7 @@ namespace DayHud
         private void OnDestroy()
         {
             DayHudApi.Detach(this);
+            RestoreCalendarSkin();
             SetHovering(false);
             ClearNotifications();
             SetMoneyHovering(false);
@@ -1778,33 +2326,31 @@ namespace DayHud
         }
 
         /// <summary>
-        /// 墙上的纸质日历和 HUD 重复了，收起来只留 HUD；mod 关掉时再放回去。
+        /// 墙上的纸质日历和 HUD 重复了，整块收起来；mod 关掉时再放回去。
         /// </summary>
         private void HidePhysicalCalendar()
         {
             try
             {
                 StoreCalendar calendar = FindStoreCalendar();
-                if (calendar == null)
+                if (calendar != null)
                 {
-                    return;
+                    HideObject(calendar.gameObject, hiddenCalendarObjects);
+
+                    Transform parent = calendar.transform.parent;
+                    if (parent != null)
+                    {
+                        HideChild(parent, "CalendarTop", hiddenCalendarObjects);
+                        HideChild(parent, "CalendarGlow", hiddenCalendarObjects);
+                    }
+
+                    if (calendar.dayTMP != null)
+                    {
+                        HideObject(calendar.dayTMP.gameObject, hiddenCalendarObjects);
+                    }
                 }
 
-                HideObject(calendar.gameObject, hiddenCalendarObjects);
-
-                Transform parent = calendar.transform.parent;
-                if (parent != null)
-                {
-                    HideChild(parent, "CalendarTop", hiddenCalendarObjects);
-                    HideChild(parent, "CalendarGlow", hiddenCalendarObjects);
-                }
-
-                if (calendar.dayTMP != null)
-                {
-                    HideObject(calendar.dayTMP.gameObject, hiddenCalendarObjects);
-                }
-
-                // 组件引用偶尔会指到别的对象，按场景里的实际名字再兜一遍
+                // 按名字兜底，防止组件引用指到别的对象
                 HideAllSceneObjects("Calendar", hiddenCalendarObjects);
                 HideAllSceneObjects("CalendarTop", hiddenCalendarObjects);
                 HideAllSceneObjects("CalendarGlow", hiddenCalendarObjects);
@@ -2406,6 +2952,11 @@ namespace DayHud
         }
     }
 }
+
+
+
+
+
 
 
 

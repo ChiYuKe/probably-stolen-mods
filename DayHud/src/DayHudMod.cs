@@ -13,6 +13,8 @@ namespace DayHud
         private ConfigEntry<bool> hideCalendarEntry;
         private ConfigEntry<bool> hideCreditEntry;
         private ConfigEntry<bool> hideOutsideEntry;
+        private ConfigEntry<bool> calendarSkinEntry;
+        private ConfigEntry<bool> calendarTrimEntry;
         private GameObject hudObject;
         private DayHudPanel panel;
 
@@ -46,6 +48,20 @@ namespace DayHud
                     () => ConfigText("config_hide_outside", "在其他场景隐藏 HUD"),
                     () => ConfigText("config_hide_outside_tip",
                         "开启后离开当铺去淘荒、地图等场景时自动收起 HUD，回到店里再显示。"));
+                calendarSkinEntry = config.Define(
+                    "calendar_retro_panel",
+                    true,
+                    "HUD",
+                    () => ConfigText("config_calendar_skin", "日历窗口换复古面板"),
+                    () => ConfigText("config_calendar_skin_tip",
+                        "开启后打开日历时，日历窗口的背景会换成模组自带的复古工业面板。"));
+                calendarTrimEntry = config.Define(
+                    "calendar_trim_edges",
+                    true,
+                    "HUD",
+                    () => ConfigText("config_calendar_trim", "裁掉日历底图的透明边"),
+                    () => ConfigText("config_calendar_trim_tip",
+                        "开启后会把背景图四周的透明外边裁掉再铺满窗口；关掉则整张图直接拉伸铺满。"));
             }
             catch (Exception e)
             {
@@ -94,11 +110,32 @@ namespace DayHud
                 }
             }
 
+            if (calendarSkinEntry != null)
+            {
+                calendarSkinEntry.OnChanged += OnCalendarSkinChanged;
+
+                if (panel != null)
+                {
+                    panel.SetCalendarSkin(calendarSkinEntry.Value);
+                }
+            }
+
+            if (calendarTrimEntry != null)
+            {
+                calendarTrimEntry.OnChanged += OnCalendarTrimChanged;
+
+                if (panel != null)
+                {
+                    panel.SetCalendarTrimEdges(calendarTrimEntry.Value);
+                }
+            }
+
             // F9 里能开关，截图或者嫌挡视野的时候用
             try
             {
-                ModHelper.AddDebugFunction(manifest.ID, "Modding", "天数圆盘 开/关", ToggleHud);
-                ModHelper.AddDebugFunction(manifest.ID, "Modding", "天数圆盘 推送测试通知", PushTestNotification);
+                ModHelper.AddDebugFunction(manifest.ID, "Modding", "当铺 HUD 开/关", ToggleHud);
+                ModHelper.AddDebugFunction(manifest.ID, "Modding", "当铺 HUD 推送测试通知", PushTestNotification);
+                ModHelper.AddDebugFunction(manifest.ID, "Modding", "当铺 HUD 推送永久通知", PushPersistentTestNotification);
             }
             catch (Exception e)
             {
@@ -123,6 +160,16 @@ namespace DayHud
             if (hideOutsideEntry != null)
             {
                 hideOutsideEntry.OnChanged -= OnHideOutsideChanged;
+            }
+
+            if (calendarSkinEntry != null)
+            {
+                calendarSkinEntry.OnChanged -= OnCalendarSkinChanged;
+            }
+
+            if (calendarTrimEntry != null)
+            {
+                calendarTrimEntry.OnChanged -= OnCalendarTrimChanged;
             }
 
             try
@@ -178,6 +225,16 @@ namespace DayHud
             {
                 panel.SetHideOutsideStore(hideOutsideEntry.Value);
             }
+
+            if (calendarSkinEntry != null)
+            {
+                panel.SetCalendarSkin(calendarSkinEntry.Value);
+            }
+
+            if (calendarTrimEntry != null)
+            {
+                panel.SetCalendarTrimEdges(calendarTrimEntry.Value);
+            }
         }
 
         private void OnHideCalendarChanged(bool value)
@@ -204,6 +261,22 @@ namespace DayHud
             }
         }
 
+        private void OnCalendarSkinChanged(bool value)
+        {
+            if (panel != null)
+            {
+                panel.SetCalendarSkin(value);
+            }
+        }
+
+        private void OnCalendarTrimChanged(bool value)
+        {
+            if (panel != null)
+            {
+                panel.SetCalendarTrimEdges(value);
+            }
+        }
+
         private void PushTestNotification()
         {
             try
@@ -222,6 +295,27 @@ namespace DayHud
             catch (Exception e)
             {
                 log.Warning("推送测试通知失败：" + e.Message);
+            }
+        }
+
+        private void PushPersistentTestNotification()
+        {
+            try
+            {
+                if (panel == null)
+                {
+                    EnsureHud();
+                }
+
+                if (panel != null)
+                {
+                    panel.NotifyPersistent(ConfigText("notify_test_persistent", "永久通知测试"),
+                        DayHudPanel.NoticeTone.Warning, null, true);
+                }
+            }
+            catch (Exception e)
+            {
+                log.Warning("推送永久通知失败：" + e.Message);
             }
         }
 
@@ -248,3 +342,5 @@ namespace DayHud
         }
     }
 }
+
+

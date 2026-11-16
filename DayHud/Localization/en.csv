@@ -15,8 +15,19 @@ config_hide_credit,Hide the wall credit screen
 config_hide_credit_tip,When enabled the wall credit screen is hidden; the balance is shown on the money bar under the dial.
 config_hide_outside,Hide the HUD outside the store
 config_hide_outside_tip,When enabled the HUD is hidden while scavenging or travelling outside the store, and comes back when you return.
+config_calendar_skin,Retro calendar window panel
+config_calendar_skin_tip,Replaces the calendar window background with the mod's retro industrial panel.
+config_calendar_trim,Trim transparent edges of the calendar panel
+config_calendar_trim_tip,When enabled the transparent border around the background image is cropped before it fills the window; disable to stretch the whole image.
 notify_produce,{0} produced {1} ×{2}
 notify_produce_one,{0} produced {1}
 notify_machine_default,Hydroponics
 notify_item_default,Crop
 notify_test,Notification test
+notify_click_focus,Click to focus
+notify_folded|{0} more notifications
+notify_collapse|Collapse
+notify_expand_hint|Click to expand all
+notify_collapse_hint|Click to collapse
+notify_dismiss_hint|Click × to dismiss
+notify_test_persistent|Persistent test

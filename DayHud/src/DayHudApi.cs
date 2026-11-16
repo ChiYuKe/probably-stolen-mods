@@ -71,6 +71,7 @@ namespace DayHud
         /// <summary>
         /// 反射友好的入口：参数只有 string / float，不依赖 DayHud 里的任何类型。
         /// tone 支持 info / warning / danger / muted，也接受 warn / error / silent。
+        /// duration &lt;= 0 表示永久通知（需要点 × 关闭）；否则到时间自动消失。
         /// HUD 还没建好时会排队，返回 true 表示已接收。
         /// </summary>
         public static bool Push(string message, string tone = "info", float duration = 7f)
@@ -105,7 +106,16 @@ namespace DayHud
         }
 
         /// <summary>
+        /// 反射友好的永久通知入口：不会自动过期，需要点 × 关闭。
+        /// </summary>
+        public static bool PushPersistent(string message, string tone = "info")
+        {
+            return Push(message, tone, 0f);
+        }
+
+        /// <summary>
         /// 反射友好的可点击入口：点击通知后打开并居中 focusItem 的 contentWindow。
+        /// duration &lt;= 0 表示永久通知。
         /// </summary>
         public static bool PushFocus(string message, string tone, float duration, GameItem focusItem)
         {
@@ -149,10 +159,19 @@ namespace DayHud
             }
         }
 
-        /// <summary>推一条普通通知，默认 7 秒后消失。</summary>
+        /// <summary>推一条普通通知，默认 7 秒后消失；duration &lt;= 0 为永久通知。</summary>
         public static void Notify(string message, float duration = 7f)
         {
             Notify(message, Tone.Info, duration);
+        }
+
+        /// <summary>
+        /// 推一条永久通知，需要点 × 才会消失。
+        /// </summary>
+        public static void NotifyPersistent(string message, Tone tone = Tone.Info,
+            Action onClick = null, bool allowDuplicate = false)
+        {
+            Notify(message, tone, 0f, onClick, allowDuplicate);
         }
 
         /// <summary>

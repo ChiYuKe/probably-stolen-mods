@@ -10,9 +10,10 @@
 
 | 方法 | 签名 | 说明 |
 | --- | --- | --- |
-| `Push` | `static bool Push(string message, string tone, float duration)` | 普通通知 |
-| `PushFocus` | `static bool PushFocus(string message, string tone, float duration, GameItem focusItem)` | 点击后打开并居中物品/机器窗口 |
-| `PushAction` | `static bool PushAction(string message, string tone, float duration, Action onClick)` | 点击后执行自定义回调 |
+| `Push` | `static bool Push(string message, string tone, float duration)` | 普通通知；`duration <= 0` 为永久通知 |
+| `PushPersistent` | `static bool PushPersistent(string message, string tone)` | 永久通知，点 × 才消失 |
+| `PushFocus` | `static bool PushFocus(string message, string tone, float duration, GameItem focusItem)` | 点击后打开并居中物品/机器窗口；`duration <= 0` 为永久 |
+| `PushAction` | `static bool PushAction(string message, string tone, float duration, Action onClick)` | 点击后执行自定义回调；`duration <= 0` 为永久 |
 | `IsAvailable` | `static bool IsAvailable { get; }` | HUD 是否已建好；不判断也可以，`Push` 会排队 |
 | `ApiVersion` | `static int ApiVersion { get; }` | 当前为 `2`，后续只增不改 |
 
@@ -152,10 +153,21 @@ DayHudBridge.Push("我的机器开始运行", "info", 6f);
 DayHudBridge.Push("水位偏低", "warning", 8f);
 ```
 
+永久通知（点 × 才消失）：
+
+```csharp
+DayHudBridge.Push("水培系统缺水，已暂停", "danger", 0f);
+
+// 或者反射 PushPersistent(string,string)
+Type api = Type.GetType("DayHud.DayHudApi, DayHud");
+api?.GetMethod("PushPersistent", new[] { typeof(string), typeof(string) })
+   ?.Invoke(null, new object[] { "需要手动关闭的提醒", "danger" });
+```
+
 点击聚焦物品/机器窗口：
 
 ```csharp
-// machine 是你自己的事件里拿到的 GameItem
+// machine 是你自己的事件里拿到的 GameItem；duration 传 0 就是永久通知
 DayHudBridge.PushFocus($"产出 {output.name} ×{count}", machine, "info", 10f);
 ```
 
@@ -171,6 +183,9 @@ DayHudBridge.PushAction("客户到店", () => OpenMyCustomerWindow(), "info", 8f
 - **不要手动 `Assembly.LoadFrom` DayHud.dll**，让游戏的 mod 加载器自己加载；手动加载可能造成重复程序集。
 - **主线程调用**：Unity 的 UI 操作必须在主线程；mod 的事件回调一般都在主线程。
 - **没装 DayHud**：`Type.GetType` 返回 `null`，`Push` 返回 `false`，不会抛异常。
+- **永久通知**：`duration <= 0` 或 `PushPersistent` 创建，不会自动过期，行尾显示 `×`，点 `×` 才移除；永久通知折叠在“已折叠通知（N）”里时也不会过期。
+- **限时通知**：`duration > 0`，到时间自动淡出；折叠期间暂停计时，展开后才继续。
+- **折叠**：默认显示 5 条，多出的收进“已折叠通知（N）”，点击展开全部，底部变成“收起通知”可再折回；最多保留 18 条。
 - **装了旧版 DayHud**：旧版本可能只有 `Push`，没有 `PushFocus` / `PushAction`。Bridge 里检测到方法不存在时退回普通通知，消息照常显示，只是不能点击；如果你只打算支持最新版，也可以把 fallback 改成 `return false`。
 - **装了但 HUD 还没建好**：`Push` 会先排队（最多 20 条），HUD 建好后补发；`Push` 返回 `true` 表示已接收。
 - **旧版 DayHud**：没有 `PushFocus` / `PushAction` 时，Bridge 自动退回 `Push`，不会崩。

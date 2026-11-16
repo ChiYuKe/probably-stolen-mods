@@ -12,6 +12,7 @@
 - 倒计时分「今天付 / 明天付 / N 天后付」三档；抵押状态显示的是还款日，不是租金。
 - 悬停时描边高亮、鼠标变手型；提示文字优先用游戏本地化表里的 `inte_calendar_hover`，取不到就用「查看日历」兜底。
 - 点击打开日历。当前场景里没有日历界面的话只写一条警告，不会崩。
+- 日历窗口打开时自动把它的底图换成 `Textures/calendar_panel.png`（复古工业面板），贴图自带的透明外边会自动裁掉再铺满窗口；模组设置里可以关掉换图，也可以单独关掉“裁透明边”，关掉或禁用模组时会把游戏原来的底图换回去。
 - 命中范围是椭圆：矩形贴图的透明四角不响应悬停和点击（`DayHudHitArea` 实现 `ICanvasRaycastFilter`），最外圈描边稍微放宽，保证能触发。
 - F9 开发面板 → Modding → 「天数圆盘 开/关」，截图或者嫌挡视野的时候用。
 
@@ -24,7 +25,7 @@ DayHud/
 │   ├── DayHudMod.cs      入口：建常驻 Canvas、F9 开关
 │   ├── DayHudPanel.cs    表盘本体：贴图、三段文字、悬停、点击
 │   └── DayHudHitArea.cs  椭圆命中判定
-├── Textures/             retro_dial.png（表盘）、retro_dial_mask.png（描边遮罩）
+├── Textures/             retro_dial.png（表盘）、retro_dial_mask.png（描边遮罩）、calendar_panel.png（日历窗口底图）
 └── Localization/         en / zh / zh-Hans / zh-Hant 四份 csv
 ```
 

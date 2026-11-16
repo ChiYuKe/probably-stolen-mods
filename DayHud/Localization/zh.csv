@@ -15,8 +15,19 @@ config_hide_credit,隐藏墙上的信用点屏幕
 config_hide_credit_tip,开启后墙上的信用点屏幕会收起来，余额显示在表盘下方的货币条上。
 config_hide_outside,在其他场景隐藏 HUD
 config_hide_outside_tip,开启后离开当铺去淘荒、地图等场景时自动收起 HUD，回到店里再显示。
+config_calendar_skin,日历窗口换复古面板
+config_calendar_skin_tip,开启后打开日历时，日历窗口的背景会换成模组自带的复古工业面板。
+config_calendar_trim,裁掉日历底图的透明边
+config_calendar_trim_tip,开启后会把背景图四周的透明外边裁掉再铺满窗口；关掉则整张图直接拉伸铺满。
 notify_produce,{0} 产出 {1} ×{2}
 notify_produce_one,{0} 产出 {1}
 notify_machine_default,水培系统
 notify_item_default,作物
 notify_test,通知测试
+notify_click_focus,点击聚焦
+notify_folded|已折叠通知（{0}）
+notify_collapse|收起通知
+notify_expand_hint|点击展开全部通知
+notify_collapse_hint|点击收起通知
+notify_dismiss_hint|点 × 关闭
+notify_test_persistent|永久通知测试
