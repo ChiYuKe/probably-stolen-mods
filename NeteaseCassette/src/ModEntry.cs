@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace NeteaseCassette
@@ -51,6 +52,13 @@ namespace NeteaseCassette
             ModHook.OnCreateTooltipLate += AddCaseTooltip;
             ModHelper.AddDebugFunction(ModId, "Modding", "网易云磁带机", CloudWindow.Open);
             ModHelper.AddDebugFunction(ModId, "Modding", "给一个磁盘收纳盒", SpawnCase);
+            // 掉落表导出（文档已经整理完了，先停用；要用就把这几行取消注释）
+            // ModHelper.AddDebugFunction(ModId, "Modding", "导出掉落表", LootDump.Run);
+
+            // 让收纳盒混进家居用品的货里，供应商进货时有几率带一个
+            ModHelper.AddLootEntry(ModId, "householdTable", CaseItemId, 20);
+            ModHook.OnPlaceInventorInventoryItemLate += OfferCaseToInventor;
+            // ModHook.OnLootTablesLoaded += LootDump.Run;
 
             Log.Log("网易云客户端就绪，登录状态：" + (Client.IsLoggedIn ? (Client.Nickname ?? "已登录") : "未登录"));
         }
@@ -61,6 +69,9 @@ namespace NeteaseCassette
             ModHook.OnModItemDirectoryInit -= RegisterItems;
             ModHook.OnCreateTooltipLate -= AddCaseTooltip;
             ModHelper.RemoveDebugFunctions(ModId);
+            ModHelper.RemoveLootEntry(ModId, "householdTable", CaseItemId);
+            ModHook.OnPlaceInventorInventoryItemLate -= OfferCaseToInventor;
+            // ModHook.OnLootTablesLoaded -= LootDump.Run;
 
             SaveSession();
             StreamPlayer.Shutdown();
@@ -82,6 +93,7 @@ namespace NeteaseCassette
                 Lyrics.RestoreIfEnabled();
                 SeedCaseOnce();
                 CaseFrame.Start();
+                // LootDump.Run();
             }
             catch (Exception e)
             {
@@ -113,11 +125,8 @@ namespace NeteaseCassette
             item.SetContentWindow(window);
 
             item.EnableManufacturer("alison");
-            // 0 价值：盒子别被当成货卖掉，里面还有磁带
-            item.unitValue = 0L;
-            item.unitBaseValue = 0L;
-            item.lateUnitValue = 0L;
-            item.backupUnitValue = 0L;
+            item.unitValue = 40L;
+            item.unitBaseValue = 40L;
             return item;
         }
 
@@ -222,6 +231,20 @@ namespace NeteaseCassette
             }
 
             return 0;
+        }
+
+        // 杰克逊博士来送货时，柜台多摆一个收纳盒（未拥有，玩家要花钱买）
+        private static void OfferCaseToInventor(List<GameItem> items)
+        {
+            try
+            {
+                PlayerStore.Instance.AddDirectSellingItemToTable(CaseItemId);
+                Log?.Log("杰克逊的货里塞了一个磁盘收纳盒");
+            }
+            catch (Exception e)
+            {
+                Log?.Warning("给杰克逊加货失败：" + e.Message);
+            }
         }
 
         private static void SpawnCase()
