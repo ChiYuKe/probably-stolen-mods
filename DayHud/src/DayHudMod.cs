@@ -12,7 +12,9 @@ namespace DayHud
         private ModLog log;
         private ConfigEntry<bool> hideCalendarEntry;
         private ConfigEntry<bool> hideCreditEntry;
+        private ConfigEntry<bool> hideFeedbackEntry;
         private ConfigEntry<bool> hideOutsideEntry;
+        private GameObject calendarFeedbackObject;
         private ConfigEntry<bool> calendarSkinEntry;
         private ConfigEntry<bool> calendarTrimEntry;
         private GameObject hudObject;
@@ -41,6 +43,13 @@ namespace DayHud
                     () => ConfigText("config_hide_credit", "隐藏墙上的信用点屏幕"),
                     () => ConfigText("config_hide_credit_tip",
                         "开启后墙上的信用点屏幕会收起来，余额显示在表盘下方的货币条上。"));
+                hideFeedbackEntry = config.Define(
+                    "hide_feedback_box",
+                    true,
+                    "HUD",
+                    () => ConfigText("config_hide_feedback", "隐藏墙上的反馈箱"),
+                    () => ConfigText("config_hide_feedback_tip",
+                        "开启后墙上的反馈箱会收起来，阵营声望改在日历的“反馈”标签页查看。"));
                 hideOutsideEntry = config.Define(
                     "hide_outside_store",
                     true,
@@ -100,6 +109,16 @@ namespace DayHud
                 }
             }
 
+            if (hideFeedbackEntry != null)
+            {
+                hideFeedbackEntry.OnChanged += OnHideFeedbackChanged;
+
+                if (panel != null)
+                {
+                    panel.SetHideFeedbackBox(hideFeedbackEntry.Value);
+                }
+            }
+
             if (hideOutsideEntry != null)
             {
                 hideOutsideEntry.OnChanged += OnHideOutsideChanged;
@@ -141,11 +160,33 @@ namespace DayHud
             {
                 log.Warning("注册 F9 开关失败：" + e.Message);
             }
+
+            try
+            {
+                if (calendarFeedbackObject != null)
+                {
+                    UnityEngine.Object.Destroy(calendarFeedbackObject);
+                }
+
+                calendarFeedbackObject = new GameObject("DayHudCalendarFeedback");
+                UnityEngine.Object.DontDestroyOnLoad(calendarFeedbackObject);
+                calendarFeedbackObject.AddComponent<CalendarFeedbackTab>().Init(manifest.ID, log);
+            }
+            catch (Exception e)
+            {
+                log.Warning("安装日历反馈标签失败：" + e.Message);
+            }
         }
 
         public void OnDisable()
         {
             DayHudApi.Detach(panel);
+
+            if (calendarFeedbackObject != null)
+            {
+                UnityEngine.Object.Destroy(calendarFeedbackObject);
+                calendarFeedbackObject = null;
+            }
 
             if (hideCalendarEntry != null)
             {
@@ -155,6 +196,11 @@ namespace DayHud
             if (hideCreditEntry != null)
             {
                 hideCreditEntry.OnChanged -= OnHideCreditChanged;
+            }
+
+            if (hideFeedbackEntry != null)
+            {
+                hideFeedbackEntry.OnChanged -= OnHideFeedbackChanged;
             }
 
             if (hideOutsideEntry != null)
@@ -221,6 +267,11 @@ namespace DayHud
                 panel.SetHideCreditDisplay(hideCreditEntry.Value);
             }
 
+            if (hideFeedbackEntry != null)
+            {
+                panel.SetHideFeedbackBox(hideFeedbackEntry.Value);
+            }
+
             if (hideOutsideEntry != null)
             {
                 panel.SetHideOutsideStore(hideOutsideEntry.Value);
@@ -250,6 +301,14 @@ namespace DayHud
             if (panel != null)
             {
                 panel.SetHideCreditDisplay(value);
+            }
+        }
+
+        private void OnHideFeedbackChanged(bool value)
+        {
+            if (panel != null)
+            {
+                panel.SetHideFeedbackBox(value);
             }
         }
 

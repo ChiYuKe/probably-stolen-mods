@@ -31,3 +31,7 @@ notify_expand_hint|点击展开全部通知
 notify_collapse_hint|点击收起通知
 notify_dismiss_hint|点 × 关闭
 notify_test_persistent|永久通知测试
+calendar_tab_feedback,反馈
+calendar_feedback_title,阵营声望
+config_hide_feedback|隐藏墙上的反馈箱
+config_hide_feedback_tip|开启后墙上的反馈箱会收起来，阵营声望改在日历的“反馈”标签页查看。

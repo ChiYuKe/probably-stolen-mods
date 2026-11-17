@@ -31,3 +31,7 @@ notify_expand_hint|Click to expand all
 notify_collapse_hint|Click to collapse
 notify_dismiss_hint|Click × to dismiss
 notify_test_persistent|Persistent test
+calendar_tab_feedback,Feedback
+calendar_feedback_title,Faction Reputation
+config_hide_feedback|Hide the feedback box
+config_hide_feedback_tip|When enabled the wall feedback box is hidden; faction reputation is shown in the calendar's Feedback tab.

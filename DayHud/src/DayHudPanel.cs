@@ -114,7 +114,7 @@ namespace DayHud
 
         private const int VisibleNotifications = 5;
         private const int MaxStoredNotifications = 18;
-        private const float NotificationRowHeight = 38f;
+        private const float NotificationRowHeight = 42f;
         private const float NotificationGap = 5f;
         private const float NotificationWidth = 230f;
         private RectTransform notificationRoot;
@@ -144,6 +144,9 @@ namespace DayHud
         private bool hideCreditDisplay = true;
         private bool creditHidden;
         private readonly List<HiddenObject> hiddenCreditObjects = new List<HiddenObject>();
+        private bool hideFeedbackBox = true;
+        private bool feedbackHidden;
+        private readonly List<HiddenObject> hiddenFeedbackObjects = new List<HiddenObject>();
         private bool hideOutsideStore = true;
         private bool calendarSkin = true;
         private bool calendarTrimEdges = true;
@@ -250,6 +253,26 @@ namespace DayHud
             {
                 creditHidden = true;
                 HideCreditDisplay();
+            }
+        }
+
+        /// <summary>
+        /// 模组配置：是否把墙上的反馈箱收起来。默认开。
+        /// 声望面板已经整合进高级日历的“反馈”标签页，墙上的反馈箱就只留外观、不做交互。
+        /// </summary>
+        public void SetHideFeedbackBox(bool hide)
+        {
+            hideFeedbackBox = hide;
+
+            if (!hide && feedbackHidden)
+            {
+                feedbackHidden = false;
+                RestoreFeedbackBox();
+            }
+            else if (hide && !feedbackHidden && ShouldShow())
+            {
+                feedbackHidden = true;
+                HideFeedbackBox();
             }
         }
 
@@ -654,7 +677,7 @@ namespace DayHud
             rect.sizeDelta = new Vector2(width * 0.64f, height * 0.44f);
             rect.anchoredPosition = new Vector2(width * 0.083f, -height * 0.035f);
 
-            float size = Mathf.Clamp(height * 0.33f, 9f, 24f);
+            float size = Mathf.Clamp(height * 0.39f, 9f, 28f);
             moneyText.fontSizeMax = size;
             moneyText.fontSize = size;
             moneyText.fontSizeMin = 9f;
@@ -885,7 +908,7 @@ namespace DayHud
             NotificationItem item = CreateNotificationItem(message, tone, duration, onClick);
             notifications.Insert(0, item);
 
-            while (notifications.Count > MaxStoredNotifications)
+            while (notifications.Count > GetMaxStoredNotifications())
             {
                 RemoveNotificationAt(notifications.Count - 1);
             }
@@ -952,10 +975,10 @@ namespace DayHud
             }
 
             text.fontStyle = noteStyle;
-            text.fontSize = 15f;
+            text.fontSize = 18f;
             text.enableAutoSizing = true;
-            text.fontSizeMax = 15f;
-            text.fontSizeMin = 11f;
+            text.fontSizeMax = 18f;
+            text.fontSizeMin = 12f;
             text.alignment = TextAlignmentOptions.MidlineLeft;
             text.color = new Color32(235, 225, 205, 255);
             text.enableWordWrapping = false;
@@ -981,7 +1004,7 @@ namespace DayHud
                 }
 
                 chevron.fontStyle = FontStyles.Normal;
-                chevron.fontSize = 16f;
+                chevron.fontSize = 18f;
                 chevron.enableAutoSizing = false;
                 chevron.alignment = TextAlignmentOptions.Center;
                 chevron.color = new Color32(196, 180, 150, 255);
@@ -1009,7 +1032,7 @@ namespace DayHud
                 }
 
                 closeText.fontStyle = FontStyles.Normal;
-                closeText.fontSize = 18f;
+                closeText.fontSize = 20f;
                 closeText.enableAutoSizing = false;
                 closeText.alignment = TextAlignmentOptions.Center;
                 closeText.color = new Color32(206, 150, 130, 255);
@@ -1068,6 +1091,12 @@ namespace DayHud
 
         private void LayoutNotifications()
         {
+            int maxStored = GetMaxStoredNotifications();
+            while (notifications.Count > maxStored)
+            {
+                RemoveNotificationAt(notifications.Count - 1);
+            }
+
             if (notificationRoot != null)
             {
                 notificationRoot.sizeDelta = new Vector2(NotificationWidth,
@@ -1135,6 +1164,24 @@ namespace DayHud
             }
         }
 
+        private int GetMaxStoredNotifications()
+        {
+            if (canvas == null || dial == null)
+            {
+                return MaxStoredNotifications;
+            }
+
+            float scale = canvas.scaleFactor > 0.0001f ? canvas.scaleFactor : 1f;
+            float gameHeightPixels = LetterboxManager.GameAreaHeight > 0
+                ? LetterboxManager.GameAreaHeight
+                : Screen.height;
+            float top = -dial.anchoredPosition.y + panelHeight * 0.5f + 10f;
+            float available = gameHeightPixels / scale - top - 10f;
+            float step = NotificationRowHeight + NotificationGap;
+            int fit = Mathf.FloorToInt((available - step) / step);
+            return Mathf.Clamp(fit, VisibleNotifications, MaxStoredNotifications);
+        }
+
         private void EnsureCollapseRow()
         {
             if (collapseRow != null)
@@ -1145,9 +1192,9 @@ namespace DayHud
             collapseRow = CreateNotificationItem(string.Empty, NoticeTone.Muted, float.MaxValue,
                 ToggleNotificationsExpanded);
             collapseRow.Text.alignment = TextAlignmentOptions.Center;
-            collapseRow.Text.fontSize = 13f;
-            collapseRow.Text.fontSizeMax = 13f;
-            collapseRow.Text.fontSizeMin = 11f;
+            collapseRow.Text.fontSize = 15f;
+            collapseRow.Text.fontSizeMax = 15f;
+            collapseRow.Text.fontSizeMin = 13f;
             collapseRow.Text.color = new Color32(196, 180, 150, 255);
             collapseRow.Background.color = new Color32(24, 18, 30, 242);
             collapseRow.BaseColor = new Color32(24, 18, 30, 242);
@@ -1657,6 +1704,12 @@ namespace DayHud
                     RestoreCreditDisplay();
                 }
 
+                if (feedbackHidden)
+                {
+                    feedbackHidden = false;
+                    RestoreFeedbackBox();
+                }
+
                 return;
             }
 
@@ -1694,6 +1747,20 @@ namespace DayHud
                 RestoreCreditDisplay();
             }
 
+            if (hideFeedbackBox)
+            {
+                if (!feedbackHidden)
+                {
+                    feedbackHidden = true;
+                    HideFeedbackBox();
+                }
+            }
+            else if (feedbackHidden)
+            {
+                feedbackHidden = false;
+                RestoreFeedbackBox();
+            }
+
             if (calendarHidden)
             {
                 KeepObjectsHidden(hiddenCalendarObjects);
@@ -1702,6 +1769,11 @@ namespace DayHud
             if (creditHidden)
             {
                 KeepObjectsHidden(hiddenCreditObjects);
+            }
+
+            if (feedbackHidden)
+            {
+                KeepObjectsHidden(hiddenFeedbackObjects);
             }
 
             if (!retroApplied)
@@ -1743,6 +1815,7 @@ namespace DayHud
             SetMoneyHovering(false);
             RestorePhysicalCalendar();
             RestoreCreditDisplay();
+            RestoreFeedbackBox();
             ModHook.OnModAssetsLoaded -= OnModAssetsLoaded;
 
             try
@@ -1946,36 +2019,36 @@ namespace DayHud
             float width = panelWidth;
             float height = panelHeight;
 
-            float statusSize = Mathf.Clamp(width * 0.058f, 7f, 16f);
+            float statusSize = Mathf.Clamp(width * 0.068f, 8f, 19f);
             statusText.fontSizeMax = statusSize;
             statusText.fontSize = statusSize;
-            statusText.fontSizeMin = 7f;
+            statusText.fontSizeMin = 8f;
             RectTransform statusRect = statusText.rectTransform;
             statusRect.sizeDelta = new Vector2(width * 0.5f, height * 0.09f);
             statusRect.anchoredPosition = new Vector2(0f, height * 0.295f);
 
-            float daySize = Mathf.Clamp(width * 0.19f, 14f, 44f);
+            float daySize = Mathf.Clamp(width * 0.20f, 16f, 46f);
             dayText.fontSizeMax = daySize;
             dayText.fontSize = daySize;
-            dayText.fontSizeMin = 12f;
+            dayText.fontSizeMin = 14f;
             RectTransform dayRect = dayText.rectTransform;
             dayRect.sizeDelta = new Vector2(width * 0.68f, height * 0.28f);
             dayRect.anchoredPosition = new Vector2(0f, height * (showRent ? 0.097f : 0.05f));
 
-            float weekSize = Mathf.Clamp(width * 0.074f, 9f, 20f);
+            float weekSize = Mathf.Clamp(width * 0.084f, 10f, 23f);
             weekdayText.fontSizeMax = weekSize;
             weekdayText.fontSize = weekSize;
-            weekdayText.fontSizeMin = 8f;
+            weekdayText.fontSizeMin = 9f;
             RectTransform weekRect = weekdayText.rectTransform;
             weekRect.sizeDelta = new Vector2(width * 0.54f, height * 0.14f);
             weekRect.anchoredPosition = new Vector2(0f, -height * (showRent ? 0.086f : 0.13f));
 
-            float rentSize = Mathf.Clamp(width * 0.058f, 8f, 18f);
+            float rentSize = Mathf.Clamp(width * 0.0735f, 9f, 21f);
             rentText.fontSizeMax = rentSize;
             rentText.fontSize = rentSize;
-            rentText.fontSizeMin = 8f;
+            rentText.fontSizeMin = 9f;
             RectTransform rentRect = rentText.rectTransform;
-            rentRect.sizeDelta = new Vector2(width * 0.58f, height * 0.1f);
+            rentRect.sizeDelta = new Vector2(width * 0.68f, height * 0.1f);
             rentRect.anchoredPosition = new Vector2(0f, -height * 0.237f);
             rentText.gameObject.SetActive(showRent);
         }
@@ -2401,6 +2474,27 @@ namespace DayHud
             }
         }
 
+        /// <summary>
+        /// 墙上的反馈箱也由日历的“反馈”标签页接管，默认收起。
+        /// </summary>
+        private void HideFeedbackBox()
+        {
+            try
+            {
+                HideAllSceneObjects("feedback_box", hiddenFeedbackObjects);
+
+                if (hiddenFeedbackObjects.Count > 0)
+                {
+                    log.Log("墙上反馈箱已隐藏 " + hiddenFeedbackObjects.Count + " 个对象：" +
+                            NamesOf(hiddenFeedbackObjects));
+                }
+            }
+            catch (Exception e)
+            {
+                log.Warning("隐藏墙上反馈箱失败：" + e.Message);
+            }
+        }
+
         private void HideChild(Transform parent, string childName, List<HiddenObject> hidden)
         {
             Transform child = parent.Find(childName);
@@ -2493,6 +2587,11 @@ namespace DayHud
         private void RestoreCreditDisplay()
         {
             RestoreObjects(hiddenCreditObjects);
+        }
+
+        private void RestoreFeedbackBox()
+        {
+            RestoreObjects(hiddenFeedbackObjects);
         }
 
         private void RestoreObjects(List<HiddenObject> hidden)
@@ -2952,6 +3051,11 @@ namespace DayHud
         }
     }
 }
+
+
+
+
+
 
 
 

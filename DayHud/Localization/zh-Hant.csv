@@ -31,3 +31,7 @@ notify_expand_hint|點擊展開全部通知
 notify_collapse_hint|點擊收起通知
 notify_dismiss_hint|點 × 關閉
 notify_test_persistent|永久通知測試
+calendar_tab_feedback,反饋
+calendar_feedback_title,陣營聲望
+config_hide_feedback|隱藏牆上的反饋箱
+config_hide_feedback_tip|開啟後牆上的反饋箱會收起來，陣營聲望改在日曆的「反饋」標籤頁查看。
