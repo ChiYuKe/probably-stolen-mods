@@ -30,8 +30,8 @@ namespace DayHud
         private const string MoneyMaskKey = "money_bar_mask";
         private const string LeaveTextureKey = "leave_store";
         private const string LeaveMaskKey = "leave_store_mask";
-        private const float LeaveIconSize = 120f;
-        private const float LeaveIconMargin = 22f;
+        private const float LeaveIconSize = 96f;
+        private const float LeaveIconMargin = 20f;
         private const string CalendarTextureKey = "calendar_panel";
         // 游戏日历窗口原背景就叫这个名字，找不到时用它兜底定位
         private const string CalendarBackgroundSpriteName = "calendar_stripped";
@@ -125,6 +125,13 @@ namespace DayHud
         private bool leaveIconReady;
         private bool leaveHovering;
         private StoreDoor leaveDoor;
+
+        private GameObject doorInteractionOwner;
+        private bool doorInteractionDone;
+        private readonly List<Collider2D> doorColliders = new List<Collider2D>();
+        private readonly List<bool> doorColliderStates = new List<bool>();
+        private readonly List<Behaviour> doorBehaviours = new List<Behaviour>();
+        private readonly List<bool> doorBehaviourStates = new List<bool>();
 
         private const int VisibleNotifications = 5;
         private const int MaxStoredNotifications = 18;
@@ -821,8 +828,114 @@ namespace DayHud
                 return leaveDoor;
             }
 
-            leaveDoor = FindObjectOfType<StoreDoor>();
+            // StoreDoor 组件本身可能已经被禁用交互，但实例还在，直接 GetComponent 取
+            GameObject doorObject = FindDoorObject();
+            if (doorObject != null)
+            {
+                leaveDoor = doorObject.GetComponent<StoreDoor>();
+            }
+
+            if (leaveDoor == null)
+            {
+                leaveDoor = FindObjectOfType<StoreDoor>();
+            }
+
             return leaveDoor;
+        }
+
+        /// <summary>
+        /// 旧的那扇门还留着外观，但不再响应鼠标：关掉碰撞体和交互/描边组件，
+        /// 离店统一走左下角的 HUD 图标。
+        /// </summary>
+        private void DisableDoorInteraction()
+        {
+            GameObject door = FindDoorObject();
+            if (door == null)
+            {
+                return;
+            }
+
+            if (doorInteractionDone && doorInteractionOwner == door)
+            {
+                return;
+            }
+
+            RestoreDoorInteraction();
+            doorInteractionOwner = door;
+
+            foreach (Collider2D collider in door.GetComponentsInChildren<Collider2D>(true))
+            {
+                if (collider == null)
+                {
+                    continue;
+                }
+
+                doorColliders.Add(collider);
+                doorColliderStates.Add(collider.enabled);
+                collider.enabled = false;
+            }
+
+            foreach (MonoBehaviour behaviour in door.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (behaviour == null)
+                {
+                    continue;
+                }
+
+                string typeName = behaviour.GetType().Name;
+                if (typeName != "Interactable" && typeName != "StoreDoor" && typeName != "Outlinable")
+                {
+                    continue;
+                }
+
+                doorBehaviours.Add(behaviour);
+                doorBehaviourStates.Add(behaviour.enabled);
+                behaviour.enabled = false;
+            }
+
+            doorInteractionDone = true;
+            log.Log("旧门交互已关闭，只保留外观");
+        }
+
+        private void RestoreDoorInteraction()
+        {
+            for (int i = 0; i < doorColliders.Count && i < doorColliderStates.Count; i++)
+            {
+                if (doorColliders[i] != null)
+                {
+                    doorColliders[i].enabled = doorColliderStates[i];
+                }
+            }
+
+            for (int i = 0; i < doorBehaviours.Count && i < doorBehaviourStates.Count; i++)
+            {
+                if (doorBehaviours[i] != null)
+                {
+                    doorBehaviours[i].enabled = doorBehaviourStates[i];
+                }
+            }
+
+            doorColliders.Clear();
+            doorColliderStates.Clear();
+            doorBehaviours.Clear();
+            doorBehaviourStates.Clear();
+            doorInteractionOwner = null;
+            doorInteractionDone = false;
+        }
+
+        private GameObject FindDoorObject()
+        {
+            GameObject interactable = FindSceneObject("--Interactable");
+            if (interactable != null)
+            {
+                Transform door = interactable.transform.Find("Door");
+                if (door != null)
+                {
+                    return door.gameObject;
+                }
+            }
+
+            return FindSceneObject("Door");
         }
 
         private void ApplyMoneyBarSprite()
@@ -1891,6 +2004,7 @@ namespace DayHud
             }
 
             RefreshCalendarSkin();
+            DisableDoorInteraction();
 
             bool visible = !userHidden && ShouldShow();
             if (canvas.enabled != visible)
@@ -2051,6 +2165,7 @@ namespace DayHud
             RestorePhysicalCalendar();
             RestoreCreditDisplay();
             RestoreFeedbackBox();
+            RestoreDoorInteraction();
 
             if (leaveSprite != null)
             {
@@ -3323,6 +3438,7 @@ namespace DayHud
         }
     }
 }
+
 
 
 
