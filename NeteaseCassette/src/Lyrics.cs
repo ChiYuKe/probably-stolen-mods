@@ -15,6 +15,7 @@ namespace NeteaseCassette
     {
         private const int CacheLimit = 30;
         private const int SortingOrder = 30000;
+        private const string CanvasName = "netease_cassette_lyrics";
         private const string SettingsFile = "lyrics.json";
 
         public static readonly string[] ColorNames = { "白", "黄", "青", "粉", "绿" };
@@ -86,12 +87,26 @@ namespace NeteaseCassette
             get { return Visible; }
         }
 
+        // 重新加载模组的时候，上一份实例建的浮层没人接管，会一直挂在屏幕上。
+        // 启动时扫一遍同名浮层清掉，留着也只是个关不掉的幽灵。
+        public static void RemoveStrayOverlays()
+        {
+            if (canvasObject != null) return;
+
+            int found = CountOverlays();
+            if (found <= 0) return;
+
+            ModEntry.Log?.Warning("清掉 " + found + " 个上次留下的歌词浮层");
+            DestroyOverlays();
+        }
+
         public static void Toggle()
         {
-            Settings.Shown = !Visible;
+            bool wasOpen = Visible;
+            Settings.Shown = !wasOpen;
             SaveSettings();
 
-            if (Visible) Close();
+            if (wasOpen) Close();
             else Open();
         }
 
@@ -120,17 +135,7 @@ namespace NeteaseCassette
 
         public static void Close()
         {
-            if (canvasObject != null)
-            {
-                try
-                {
-                    UnityEngine.Object.Destroy(canvasObject);
-                }
-                catch
-                {
-                    // 场景切换时已经跟着没了
-                }
-            }
+            DestroyOverlays();
             canvasObject = null;
             canvasRect = null;
             root = null;
@@ -142,6 +147,7 @@ namespace NeteaseCassette
 
         public static void Shutdown()
         {
+            running = false;
             Close();
             cache.Clear();
             settings = null;
@@ -154,6 +160,17 @@ namespace NeteaseCassette
         public static void OnTrackStarted(long id, string name)
         {
             songId = id;
+            if (string.IsNullOrEmpty(name))
+            {
+                try
+                {
+                    name = StreamPlayer.CurrentCassetteTitle();
+                }
+                catch
+                {
+                    // 拿不到标题不影响歌词
+                }
+            }
             songName = name ?? "";
             currentRow = -1;
             loadError = null;
@@ -268,6 +285,60 @@ namespace NeteaseCassette
 
         // 画布
 
+        // 关歌词的时候可能不止一个浮层（重开局、场景切过），按名字全清掉，别留一个在外面飘
+        private static void DestroyOverlays()
+        {
+            int found = CountOverlays();
+            if (found > 1)
+            {
+                ModEntry.Log?.Warning("关歌词时发现 " + found + " 个浮层，一起清掉");
+            }
+
+            if (canvasObject != null)
+            {
+                try
+                {
+                    UnityEngine.Object.Destroy(canvasObject);
+                }
+                catch
+                {
+                    // 场景切换时已经跟着没了
+                }
+            }
+
+            try
+            {
+                var canvases = UnityEngine.Object.FindObjectsOfType<Canvas>(true);
+                for (int i = 0; i < canvases.Length; i++)
+                {
+                    if (canvases[i] == null || canvases[i].name != CanvasName) continue;
+                    UnityEngine.Object.Destroy(canvases[i].gameObject);
+                }
+            }
+            catch (Exception e)
+            {
+                ModEntry.Log?.Warning("清理歌词浮层失败：" + e.Message);
+            }
+        }
+
+        private static int CountOverlays()
+        {
+            int count = 0;
+            try
+            {
+                var canvases = UnityEngine.Object.FindObjectsOfType<Canvas>(true);
+                for (int i = 0; i < canvases.Length; i++)
+                {
+                    if (canvases[i] != null && canvases[i].name == CanvasName) count++;
+                }
+            }
+            catch
+            {
+                // 查不了就算了，不影响关掉当前这个
+            }
+            return count;
+        }
+
         private static bool EnsureCanvas()
         {
             if (canvasObject != null)
@@ -283,7 +354,7 @@ namespace NeteaseCassette
                 return false;
             }
 
-            canvasObject = new GameObject("netease_cassette_lyrics", typeof(Canvas), typeof(CanvasScaler));
+            canvasObject = new GameObject(CanvasName, typeof(Canvas), typeof(CanvasScaler));
             var canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
@@ -306,7 +377,7 @@ namespace NeteaseCassette
             textMain = CreateText("lyric_main");
             textNext = CreateText("lyric_next");
 
-            ModEntry.Log?.Log("歌词浮层建好了，字体 " + font.name);
+            ModEntry.Log?.Log("歌词浮层建好了，字体 " + font.name + "（#" + canvasObject.GetInstanceID() + "）");
 
             // 画布第一帧的尺寸还是 0，等一帧再摆位置，不然会被钳到奇怪的地方
             ModHelper.StartCoroutine(ModEntry.ModId, FirstLayout());
@@ -407,10 +478,6 @@ namespace NeteaseCassette
 
             if (picked == null && candidates.Count > 0) picked = candidates[0];
 
-            if (candidates.Count > 1)
-            {
-                ModEntry.Log?.Log("歌词字体候选：" + string.Join("、", candidates.ConvertAll(f => f.name).ToArray()));
-            }
             return picked;
         }
 

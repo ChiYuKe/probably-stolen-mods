@@ -3,8 +3,8 @@
   <ID>netease_cassette</ID>
   <Name>网易云磁带机</Name>
   <Author>Liukeyu</Author>
-  <ModVersion>0.2</ModVersion>
-  <Description>给磁带播放器加一个网易云音乐入口：游戏内扫码登录，点歌后生成磁带，用原来的播放器直接放网易云的歌。</Description>
+  <ModVersion>1.0</ModVersion>
+  <Description>给磁带播放器接上网易云音乐：游戏内扫码登录，搜歌、翻歌单，点歌生成磁带，用原来的播放器直接放。带桌面歌词、播放模式和能装 30 盘磁带的收纳盒。</Description>
   <GameVersions>
     <Version>0.46</Version>
   </GameVersions>

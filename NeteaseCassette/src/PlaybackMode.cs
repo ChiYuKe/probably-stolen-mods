@@ -120,6 +120,8 @@ namespace NeteaseCassette
         // 跟原版 PlayTrackAtIndex 做一样的事（那个是私有的，只能自己来）
         private static void Play(GameItem machine, List<string> tracks, int index)
         {
+            // 先停掉旧的等待协程，不然每切一首就多留一个，歌一放完会连着触发好几次
+            AudioManager.StopAudioCoroutine();
             machine.ModifyTag(MachineCassettePlayer.CURRENT_PLAYING_CASSETTE_INDEX_TAG, tag => tag.Enable().SetInt(index));
             machine.ModifyTag(MachineCassettePlayer.CURRENT_PLAYING_TRACK_ID_TAG, tag => tag.Enable().SetString(tracks[index]));
             machine.ModifyTag(MachineCassettePlayer.CASETTE_PLAYER_STATE_INT, tag => tag.Enable().SetInt(1));

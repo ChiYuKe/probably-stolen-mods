@@ -16,7 +16,7 @@ namespace NeteaseCassette
         public const string CaseItemId = "netease_tape_case";
 
         // 打过这个标签就说明这个存档已经送过收纳盒了
-        private const string CaseSeededTag = "NETEASE_CASE_SEEDED_TAG_V2";
+        private const string CaseSeededTag = "NETEASE_CASE_SEEDED_TAG";
 
         // 卡带图数量，Textures/Items 下的 tape_01 ~ tape_64
         internal const int TapeSpriteCount = 64;
@@ -48,6 +48,7 @@ namespace NeteaseCassette
             StreamPlayer.Init(Client, Log);
 
             ModHook.OnGameLoadedLate += OnGameLoaded;
+            Lyrics.RemoveStrayOverlays();
             ModHook.OnModItemDirectoryInit += RegisterItems;
             ModHook.OnCreateTooltipLate += AddCaseTooltip;
             ModHelper.AddDebugFunction(ModId, "Modding", "网易云磁带机", CloudWindow.Open);
@@ -59,6 +60,9 @@ namespace NeteaseCassette
             ModHelper.AddLootEntry(ModId, "householdTable", CaseItemId, 20);
             ModHook.OnPlaceInventorInventoryItemLate += OfferCaseToInventor;
             // ModHook.OnLootTablesLoaded += LootDump.Run;
+
+            // 开关模组不用重开游戏也能接上播放框刷新（读档时会再启一次，重复调用是安全的）
+            CaseFrame.Start();
 
             Log.Log("网易云客户端就绪，登录状态：" + (Client.IsLoggedIn ? (Client.Nickname ?? "已登录") : "未登录"));
         }
@@ -90,6 +94,7 @@ namespace NeteaseCassette
                 bool hasDeck = EmporiumEntry.Instance != null && EmporiumEntry.Instance.cassettePlayer != null;
                 Log.Log("存档载入完成，磁带机：" + (hasDeck ? "在" : "不在") + "，云登录：" + (Client != null && Client.IsLoggedIn ? "是" : "否"));
 
+                Lyrics.RemoveStrayOverlays();
                 Lyrics.RestoreIfEnabled();
                 SeedCaseOnce();
                 CaseFrame.Start();
@@ -113,7 +118,7 @@ namespace NeteaseCassette
         {
             var item = ItemDirectory.CreateEmptyItem(CaseItemId);
             item.name = "磁盘收纳盒";
-            item.shortDescription = "横向两格高，塞得下 30 盘磁带。";
+            item.shortDescription = "能塞 30 盘磁带，双击打开。";
             item.SetSpriteAndShapeFromMod(ModId, "tape_case");
             if (item.shape == null || item.shape.width != 6 || item.shape.height != 2)
             {
@@ -151,14 +156,7 @@ namespace NeteaseCassette
 
             ModHelper.SetItemOwnerShip(caseItem, true);
 
-            int sw = caseItem.shape != null ? caseItem.shape.width : -1;
-            int sh = caseItem.shape != null ? caseItem.shape.height : -1;
-            var grid = storage as GameGridInventory;
-            int iw = grid != null && grid.inventoryShape != null ? grid.inventoryShape.width : -1;
-            int ih = grid != null && grid.inventoryShape != null ? grid.inventoryShape.height : -1;
-            bool may = storage.MayHaveValidInventorySlot(caseItem);
             bool hasSlot = storage.TryFindOneValidInventorySlot(caseItem) != null;
-            Log?.Log("收纳盒 " + sw + "x" + sh + "，储藏格 " + iw + "x" + ih + "，may=" + may + "，slot=" + hasSlot + "，格子里已有 " + storage.childItems.Count + " 件");
 
             if (!hasSlot && storage.childItems.Count == 0)
             {

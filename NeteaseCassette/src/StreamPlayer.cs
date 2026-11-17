@@ -34,6 +34,9 @@ namespace NeteaseCassette
         public static void Shutdown()
         {
             Cancel();
+            // 缓存的音频也放掉，别让一个几十兆的 AudioClip 一直挂着
+            lastSongId = 0L;
+            lastClip = null;
             client = null;
             log = null;
         }

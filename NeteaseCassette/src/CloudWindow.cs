@@ -883,6 +883,9 @@ namespace NeteaseCassette
             var controls = row.GetPanel("controls");
             var stack = controls != null ? controls.content as MachineryStack : null;
 
+            // 原版的四个播放键是横排的；已经被我们换成一竖列就说明这窗口排过了
+            if (stack != null && stack.vertical) return;
+
             // 照原版播放键的实际尺寸做，别自己定大小
             int transportSize = 16;
             if (stack != null && stack.elements.Count > 0 && stack.elements[0] != null)
