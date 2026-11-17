@@ -18,3 +18,6 @@ NeteaseCassette/tools/
 
 # 本地截的预览图，留着看效果用
 preview*.png
+
+# 单独的站点工程，自己带 git，不跟 mod 源码混在一起
+Sites/
