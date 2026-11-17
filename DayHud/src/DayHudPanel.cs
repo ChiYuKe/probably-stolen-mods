@@ -28,6 +28,10 @@ namespace DayHud
         private const string RetroMaskKey = "retro_dial_mask";
         private const string MoneyTextureKey = "money_bar";
         private const string MoneyMaskKey = "money_bar_mask";
+        private const string LeaveTextureKey = "leave_store";
+        private const string LeaveMaskKey = "leave_store_mask";
+        private const float LeaveIconSize = 120f;
+        private const float LeaveIconMargin = 22f;
         private const string CalendarTextureKey = "calendar_panel";
         // 游戏日历窗口原背景就叫这个名字，找不到时用它兜底定位
         private const string CalendarBackgroundSpriteName = "calendar_stripped";
@@ -112,6 +116,16 @@ namespace DayHud
         private bool moneyReady;
         private bool moneyHovering;
 
+        private RectTransform leaveRoot;
+        private Image leaveIcon;
+        private Image leaveHighlight;
+        private DayHudIconButton leaveButton;
+        private Sprite leaveSprite;
+        private Sprite leaveMaskSprite;
+        private bool leaveIconReady;
+        private bool leaveHovering;
+        private StoreDoor leaveDoor;
+
         private const int VisibleNotifications = 5;
         private const int MaxStoredNotifications = 18;
         private const float NotificationRowHeight = 42f;
@@ -192,6 +206,7 @@ namespace DayHud
 
             BuildDial();
             BuildMoneyBar();
+            BuildLeaveIcon();
             BuildNotifications();
 
             try
@@ -605,6 +620,209 @@ namespace DayHud
             LayoutMoneyText();
             ApplyMoneyBarSprite();
             moneyRoot.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 左下角的离店图标，功能等价于店里那扇门的“离开店铺”，
+        /// 但入口固定在 HUD 上，不用再去找墙上的门。
+        /// </summary>
+        private void BuildLeaveIcon()
+        {
+            GameObject rootObject = new GameObject("LeaveStore", typeof(RectTransform));
+            leaveRoot = (RectTransform)rootObject.transform;
+            leaveRoot.SetParent(transform, false);
+            leaveRoot.anchorMin = Vector2.zero;
+            leaveRoot.anchorMax = Vector2.zero;
+            leaveRoot.pivot = new Vector2(0.5f, 0.5f);
+            leaveRoot.sizeDelta = new Vector2(LeaveIconSize, LeaveIconSize);
+
+            leaveHighlight = CreateImage(leaveRoot, "Highlight", null, Vector2.zero,
+                new Vector2(LeaveIconSize + 8f, LeaveIconSize + 8f));
+            leaveHighlight.color = new Color32(225, 209, 156, 255);
+            leaveHighlight.gameObject.SetActive(false);
+
+            leaveIcon = CreateImage(leaveRoot, "Icon", null, Vector2.zero,
+                new Vector2(LeaveIconSize, LeaveIconSize));
+            leaveIcon.color = Color.white;
+            leaveIcon.raycastTarget = true;
+            leaveIcon.preserveAspect = true;
+
+            leaveButton = rootObject.AddComponent<DayHudIconButton>();
+            leaveButton.Highlight = leaveHighlight.gameObject;
+            leaveButton.Target = leaveRoot;
+            leaveButton.Clicked = OnLeaveIconClicked;
+            leaveButton.Entered = () => SetLeaveHovering(true);
+            leaveButton.Exited = () => SetLeaveHovering(false);
+
+            rootObject.SetActive(false);
+        }
+
+        private void ApplyLeaveIconSprite()
+        {
+            if (leaveIcon == null || leaveHighlight == null)
+            {
+                return;
+            }
+
+            Texture2D texture = FindModTexture(LeaveTextureKey);
+            if (texture == null)
+            {
+                return;
+            }
+
+            leaveSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+            leaveSprite.name = "DayHudLeaveStore";
+
+            leaveIcon.sprite = leaveSprite;
+            leaveHighlight.sprite = leaveSprite;
+
+            // 悬停亮边用白色剪影，避免彩色底图被奶油色乘成脏色
+            Texture2D maskTexture = FindModTexture(LeaveMaskKey);
+            if (maskTexture != null)
+            {
+                leaveMaskSprite = Sprite.Create(maskTexture,
+                    new Rect(0f, 0f, maskTexture.width, maskTexture.height),
+                    new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+                leaveMaskSprite.name = "DayHudLeaveStoreMask";
+                leaveHighlight.sprite = leaveMaskSprite;
+            }
+
+            leaveHighlight.color = new Color32(225, 209, 156, 255);
+            leaveIconReady = true;
+            leaveRoot.gameObject.SetActive(ShouldShow());
+
+            try
+            {
+                // 只让不透明像素响应点击，避免方形透明边也挡住鼠标
+                leaveIcon.alphaHitTestMinimumThreshold = 0.15f;
+            }
+            catch
+            {
+                // 贴图不可读时退回整块矩形命中，不影响功能
+            }
+        }
+
+        private void PlaceLeaveIcon()
+        {
+            if (leaveRoot == null || canvas == null)
+            {
+                return;
+            }
+
+            float scale = canvas.scaleFactor;
+            if (scale <= 0.0001f)
+            {
+                return;
+            }
+
+            float leftInset = LetterboxManager.GameAreaX;
+            float bottomInset = Screen.height - (LetterboxManager.GameAreaY + LetterboxManager.GameAreaHeight);
+            float half = LeaveIconSize * 0.5f;
+
+            Vector2 target = new Vector2(
+                (leftInset + (LeaveIconMargin + half) * scale) / scale,
+                (bottomInset + (LeaveIconMargin + half) * scale) / scale);
+
+            if ((leaveRoot.anchoredPosition - target).sqrMagnitude > 0.04f)
+            {
+                leaveRoot.anchoredPosition = target;
+            }
+        }
+
+        private void SetLeaveHovering(bool value)
+        {
+            if (leaveHovering == value)
+            {
+                return;
+            }
+
+            leaveHovering = value;
+            if (leaveHighlight != null)
+            {
+                leaveHighlight.gameObject.SetActive(value);
+            }
+
+            if (value)
+            {
+                ShowLeaveTooltip();
+            }
+            else
+            {
+                HideLeaveTooltip();
+            }
+        }
+
+        private void ShowLeaveTooltip()
+        {
+            if (TooltipManager._instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                StoreDoor door = FindLeaveDoor();
+                string text = door != null ? door.GetTooltip() : null;
+                if (string.IsNullOrEmpty(text))
+                {
+                    bool chinese = false;
+                    try
+                    {
+                        chinese = LocHelper.GetCurrentLocaleCode().StartsWith("zh");
+                    }
+                    catch
+                    {
+                        // 忽略
+                    }
+
+                    text = chinese ? "离开店铺" : "Leave the store";
+                }
+
+                TooltipManager._instance.SetAndShowTooltip(text, this);
+            }
+            catch (Exception e)
+            {
+                log.Warning("显示离店提示失败：" + e.Message);
+            }
+        }
+
+        private void HideLeaveTooltip()
+        {
+            if (TooltipManager._instance != null)
+            {
+                TooltipManager._instance.HideTooltip(this);
+            }
+        }
+
+        private void OnLeaveIconClicked()
+        {
+            try
+            {
+                StoreDoor door = FindLeaveDoor();
+                if (door == null)
+                {
+                    log.Warning("当前场景找不到门，离店图标暂时不能用");
+                    return;
+                }
+
+                door.OnClick();
+            }
+            catch (Exception e)
+            {
+                log.Warning("通过 HUD 离店失败：" + e.Message);
+            }
+        }
+
+        private StoreDoor FindLeaveDoor()
+        {
+            if (leaveDoor != null)
+            {
+                return leaveDoor;
+            }
+
+            leaveDoor = FindObjectOfType<StoreDoor>();
+            return leaveDoor;
         }
 
         private void ApplyMoneyBarSprite()
@@ -1689,6 +1907,12 @@ namespace DayHud
             {
                 SetHovering(false);
                 SetMoneyHovering(false);
+                SetLeaveHovering(false);
+                if (leaveRoot != null)
+                {
+                    leaveRoot.gameObject.SetActive(false);
+                }
+
                 ClearNotifications();
                 noteFontTried = false;
 
@@ -1787,6 +2011,16 @@ namespace DayHud
                 ApplyMoneyBarSprite();
             }
 
+            if (!leaveIconReady)
+            {
+                ApplyLeaveIconSprite();
+            }
+
+            if (leaveRoot != null && leaveRoot.gameObject.activeSelf != leaveIconReady)
+            {
+                leaveRoot.gameObject.SetActive(leaveIconReady);
+            }
+
             KeepInsideGameArea();
             EnsureFont();
             RefreshRent();
@@ -1813,9 +2047,22 @@ namespace DayHud
             SetHovering(false);
             ClearNotifications();
             SetMoneyHovering(false);
+            SetLeaveHovering(false);
             RestorePhysicalCalendar();
             RestoreCreditDisplay();
             RestoreFeedbackBox();
+
+            if (leaveSprite != null)
+            {
+                Destroy(leaveSprite);
+                leaveSprite = null;
+            }
+
+            if (leaveMaskSprite != null)
+            {
+                Destroy(leaveMaskSprite);
+                leaveMaskSprite = null;
+            }
             ModHook.OnModAssetsLoaded -= OnModAssetsLoaded;
 
             try
@@ -1830,6 +2077,13 @@ namespace DayHud
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            // Canvas 根节点也会收到子对象的悬停事件，这里只认表盘本体，
+            // 否则鼠标移到左下角离店图标上也会把表盘点亮、弹出“查看日历”。
+            if (!PointerOnDial(eventData))
+            {
+                return;
+            }
+
             if (!CanInteract() || InteractionBlocked())
             {
                 return;
@@ -1846,6 +2100,11 @@ namespace DayHud
         public void OnPointerClick(PointerEventData eventData)
         {
             if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+            {
+                return;
+            }
+
+            if (!PointerOnDial(eventData))
             {
                 return;
             }
@@ -1872,6 +2131,17 @@ namespace DayHud
             {
                 log.Error("打开日历的时候崩了：" + e);
             }
+        }
+
+        private bool PointerOnDial(PointerEventData eventData)
+        {
+            if (dial == null || eventData == null)
+            {
+                return false;
+            }
+
+            return RectTransformUtility.RectangleContainsScreenPoint(dial, eventData.position,
+                eventData.pressEventCamera);
         }
 
         private static bool InteractionBlocked()
@@ -2843,6 +3113,8 @@ namespace DayHud
             {
                 dial.anchoredPosition = target;
             }
+
+            PlaceLeaveIcon();
         }
 
         private bool ShouldShow()

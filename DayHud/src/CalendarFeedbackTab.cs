@@ -325,17 +325,17 @@ namespace DayHud
             layoutRect.anchorMin = Vector2.zero;
             layoutRect.anchorMax = Vector2.one;
             layoutRect.pivot = new Vector2(0.5f, 0.5f);
-            layoutRect.offsetMin = new Vector2(40f, 295f);
+            layoutRect.offsetMin = new Vector2(40f, 220f);
             layoutRect.offsetMax = new Vector2(-40f, -235f);
-            layoutRect.localScale = Vector3.one * 1.55f;
+            layoutRect.localScale = Vector3.one * 1.7f;
             layoutRect.localRotation = Quaternion.identity;
 
             noteRect.SetParent(hostRect, false);
             noteRect.anchorMin = new Vector2(0f, 0f);
             noteRect.anchorMax = new Vector2(1f, 0f);
             noteRect.pivot = new Vector2(0.5f, 0f);
-            noteRect.offsetMin = new Vector2(40f, 160f);
-            noteRect.offsetMax = new Vector2(-40f, 265f);
+            noteRect.offsetMin = new Vector2(40f, 80f);
+            noteRect.offsetMax = new Vector2(-40f, 185f);
             noteRect.localScale = Vector3.one;
             noteRect.localRotation = Quaternion.identity;
             noteWasActive = noteRect.gameObject.activeSelf;
@@ -727,6 +727,7 @@ namespace DayHud
         }
     }
 }
+
 
 
 
