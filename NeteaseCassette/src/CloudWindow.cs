@@ -23,6 +23,9 @@ namespace NeteaseCassette
         private static int trackPage;
         private static readonly Dictionary<string, Sprite> scaledSprites = new Dictionary<string, Sprite>();
         private static MachineryButton[] modeButtons;
+        private static MachineryButton lyricButton;
+        private static Sprite lyricOn;
+        private static Sprite lyricOff;
         private static Sprite[] modeIcons;
         private static Sprite[] modeDim;
         private static RectTransform searchHost;
@@ -760,6 +763,38 @@ namespace NeteaseCassette
             return new MachineryButton(ScaleSprite(key, source, size, 1f), callback, size);
         }
 
+        // 歌词开关要能看出开没开：开着用亮图标，关着压暗
+        private static MachineryButton MakeLyricButton(int size)
+        {
+            Sprite source = LoadModSprite("icon_lyrics");
+            MachineryButton button;
+            if (source == null)
+            {
+                button = new MachineryButton("词", ToggleLyrics);
+            }
+            else
+            {
+                lyricOn = ScaleSprite("icon_lyrics", source, size, 1f);
+                lyricOff = ScaleSprite("icon_lyrics", source, size, 0.45f);
+                button = new MachineryButton(lyricOn, ToggleLyrics, size);
+            }
+            button.SetDescription("开关桌面歌词");
+            lyricButton = button;
+            return button;
+        }
+
+        private static void ToggleLyrics()
+        {
+            Lyrics.Toggle();
+            RefreshLyricButton();
+        }
+
+        private static void RefreshLyricButton()
+        {
+            if (lyricButton == null || lyricOn == null || lyricOff == null) return;
+            lyricButton.SetIcon(Lyrics.IsOpen ? lyricOn : lyricOff);
+        }
+
         // 把 32px 的图标缩到跟原版按钮一样大，顺便压暗（tint < 1）
         private static Sprite ScaleSprite(string keyName, Sprite source, int size, float tint)
         {
@@ -859,8 +894,7 @@ namespace NeteaseCassette
             var button = MakeIconButton("icon_netease", "云", Open, transportSize);
             button.SetDescription("扫码登录网易云，点歌变成磁带，用这台机器播放");
 
-            var lyricButton = MakeIconButton("icon_lyrics", "词", Lyrics.Toggle, transportSize);
-            lyricButton.SetDescription("开关桌面歌词");
+            var lyricBtn = MakeLyricButton(transportSize);
 
             var lyricSetButton = MakeIconButton("icon_settings", "设", LyricPanel.Open, transportSize);
             lyricSetButton.SetDescription("歌词的字号、颜色和位置");
@@ -872,20 +906,21 @@ namespace NeteaseCassette
                 var outer = new MachineryStack(true, 6);
                 controls.SetContent(outer);
                 stack.ResizePixels(0, 0);   // 它之前被面板撑满了整块，不清掉会把行距拉开
-                outer.Add(MachineryStack.Horizontal(button, lyricButton, lyricSetButton));
+                outer.Add(MachineryStack.Horizontal(button, lyricBtn, lyricSetButton));
                 outer.Add(stack);
                 outer.Add(modeRow);
             }
             else
             {
                 var content = MachineryStack.Vertical(
-                    MachineryStack.Horizontal(button, lyricButton, lyricSetButton),
+                    MachineryStack.Horizontal(button, lyricBtn, lyricSetButton),
                     modeRow);
                 var panel = new MachineryPanel("网易云", content, "cloud");
                 row.Add(panel);
                 controls = panel;
             }
             RefreshModeButtons();
+            RefreshLyricButton();
             if (controls != null && controls.role == null)
             {
                 controls.SetRole("cloud");

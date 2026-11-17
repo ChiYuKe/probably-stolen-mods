@@ -349,26 +349,20 @@ namespace NeteaseCassette
                               "，位置 " + root.anchoredPosition.x + "," + root.anchoredPosition.y);
         }
 
-        // 游戏 UI 里随便找个带中文的 TMP 字体，找不到就用默认的
+        // 找一款带中文的正文字体。场景里字体一大堆（还有手写体），
+        // FindObjectsOfType 的顺序每次都不一样，只认第一个会随机变字体，所以按名字挑。
         private static TMP_FontAsset FindFont()
         {
-            TMP_FontAsset first = null;
+            var candidates = new List<TMP_FontAsset>();
+            var seen = new HashSet<TMP_FontAsset>();
+
             try
             {
                 var texts = UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>(true);
                 for (int i = 0; i < texts.Length; i++)
                 {
                     var candidate = texts[i] != null ? texts[i].font : null;
-                    if (candidate == null) continue;
-                    if (first == null) first = candidate;
-                    try
-                    {
-                        if (candidate.HasCharacter('的', true)) return candidate;
-                    }
-                    catch
-                    {
-                        // 有些字体资源不让查，跳过
-                    }
+                    if (candidate != null && seen.Add(candidate)) candidates.Add(candidate);
                 }
             }
             catch (Exception e)
@@ -376,14 +370,69 @@ namespace NeteaseCassette
                 ModEntry.Log?.Warning("扫场景里的字体失败：" + e.Message);
             }
 
-            if (first != null) return first;
             try
             {
-                return TMP_Settings.defaultFontAsset;
+                var fallback = TMP_Settings.defaultFontAsset;
+                if (fallback != null && seen.Add(fallback)) candidates.Add(fallback);
             }
             catch
             {
-                return null;
+                // 设置资源可能没加载，无所谓
+            }
+
+            TMP_FontAsset picked = null;
+
+            // 先挑名字像正文字体的（Noto / 思源 / 系统黑体），手写体、装饰体往后放
+            foreach (var candidate in candidates)
+            {
+                if (LooksLikeBody(candidate) && HasChinese(candidate))
+                {
+                    picked = candidate;
+                    break;
+                }
+            }
+
+            // 再退一步：任何能显示中文的
+            if (picked == null)
+            {
+                foreach (var candidate in candidates)
+                {
+                    if (HasChinese(candidate))
+                    {
+                        picked = candidate;
+                        break;
+                    }
+                }
+            }
+
+            if (picked == null && candidates.Count > 0) picked = candidates[0];
+
+            if (candidates.Count > 1)
+            {
+                ModEntry.Log?.Log("歌词字体候选：" + string.Join("、", candidates.ConvertAll(f => f.name).ToArray()));
+            }
+            return picked;
+        }
+
+        private static bool LooksLikeBody(TMP_FontAsset candidate)
+        {
+            string name = (candidate.name ?? "").ToLowerInvariant();
+            if (name.Contains("noto")) return true;
+            if (name.Contains("sourcehan") || name.Contains("source han")) return true;
+            if (name.Contains("siyuan") || name.Contains("思源")) return true;
+            if (name.Contains("pingfang") || name.Contains("msyh") || name.Contains("heiti")) return true;
+            return false;
+        }
+
+        private static bool HasChinese(TMP_FontAsset candidate)
+        {
+            try
+            {
+                return candidate.HasCharacter('的', true);
+            }
+            catch
+            {
+                return false;
             }
         }
 
