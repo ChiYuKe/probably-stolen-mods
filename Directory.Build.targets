@@ -1,0 +1,11 @@
+<Project>
+  <Target Name="CopyModAssets" AfterTargets="Build"
+          Condition="'$(DeployToMods)' != 'false' and Exists('$(MSBuildProjectDirectory)\manifest.xml')">
+    <ItemGroup>
+      <_ModAsset Include="manifest.xml;Textures\**\*.png;Localization\**\*.csv" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ModAsset)"
+          DestinationFiles="@(_ModAsset->'$(TargetDir)%(Identity)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

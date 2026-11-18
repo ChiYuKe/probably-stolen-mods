@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup Condition="'$(DeployToMods)' != 'false' and Exists('$(MSBuildProjectDirectory)\manifest.xml')">
+    <ModFolderName Condition="'$(ModFolderName)' == ''">$(MSBuildProjectName)</ModFolderName>
+    <OutDir>$(GameModsDir)\$(ModFolderName)\</OutDir>
+    <!-- 资源变更时也让 VS 执行 MSBuild。 -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+</Project>

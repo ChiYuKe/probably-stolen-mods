@@ -13,7 +13,7 @@
     <GameDir Condition="'$(GameDir)' == ''">E:\SteamLibrary\steamapps\common\Probably Stolen</GameDir>
     <!-- 游戏自己的 dll 都在这里：Assembly-CSharp、UnityEngine.*、0Harmony 等 -->
     <Managed Condition="'$(Managed)' == ''">$(GameDir)\Probably Stolen_Data\Managed</Managed>
-    <!-- 编译产物的投放位置，默认就是游戏根目录的 Mods -->
+    <!-- 各模组的生成输出根目录 -->
     <GameModsDir Condition="'$(GameModsDir)' == ''">$(GameDir)\Mods</GameModsDir>
   </PropertyGroup>
 
@@ -21,11 +21,13 @@
     <LangVersion Condition="'$(LangVersion)' == ''">latest</LangVersion>
 
     <!--
-      true  = 编译完自动把 dll / manifest / 资源拷进 Mods（日常就用这个）
-      false = 只编译不部署，比如 CI 或者只想看看能不能编译过的时候：
+      true  = 将生成输出直接放到游戏 Mods，并同步清单和资源
+      false = 将生成输出留在项目的 bin 目录，例如 CI：
               dotnet build ProbablyStolenMods.sln -c Release -p:DeployToMods=false
     -->
     <DeployToMods Condition="'$(DeployToMods)' == ''">true</DeployToMods>
+    <!-- 先读取项目的 ModFolderName，再设置 OutDir，供 MSBuild 计算 TargetPath。 -->
+    <CustomBeforeMicrosoftCommonTargets Condition="'$(CustomBeforeMicrosoftCommonTargets)' == ''">$(MSBuildThisFileDirectory)ModOutput.props</CustomBeforeMicrosoftCommonTargets>
   </PropertyGroup>
 
   <PropertyGroup>

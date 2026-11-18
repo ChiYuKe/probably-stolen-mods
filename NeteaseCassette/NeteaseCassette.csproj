@@ -15,10 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ModTexture Include="Textures\Items\*.png" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(Managed)\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
@@ -72,11 +68,5 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
-
-  <!-- 编译完直接丢进 Mods，省得每次手动拷；-p:DeployToMods=false 可以只编译 -->
-  <Target Name="ToMods" AfterTargets="Build" Condition="'$(DeployToMods)' != 'false'">
-    <Copy SourceFiles="$(TargetPath);manifest.xml" DestinationFolder="$(GameModsDir)\NeteaseCassette" />
-    <Copy SourceFiles="@(ModTexture)" DestinationFolder="$(GameModsDir)\NeteaseCassette\Textures\Items" Condition="'@(ModTexture)' != ''" />
-  </Target>
 
 </Project>

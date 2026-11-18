@@ -21,14 +21,4 @@
     </Reference>
   </ItemGroup>
 
-  <ItemGroup>
-    <ModTexture Include="Textures\Items\*.png" />
-  </ItemGroup>
-
-  <!-- 编译完直接丢进 Mods，省得每次手动拷；-p:DeployToMods=false 可以只编译 -->
-  <Target Name="ToMods" AfterTargets="Build" Condition="'$(DeployToMods)' != 'false'">
-    <Copy SourceFiles="$(TargetPath);manifest.xml" DestinationFolder="$(GameModsDir)\EnergyBar" />
-    <Copy SourceFiles="@(ModTexture)" DestinationFolder="$(GameModsDir)\EnergyBar\Textures\Items" Condition="'@(ModTexture)' != ''" />
-  </Target>
-
 </Project>
