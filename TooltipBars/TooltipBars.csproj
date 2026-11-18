@@ -29,14 +29,4 @@
     </Reference>
   </ItemGroup>
 
-  <ItemGroup>
-    <ModLocalization Include="Localization\*.csv" />
-  </ItemGroup>
-
-  <!-- 编译完直接丢进 Mods，省得每次手动拷；-p:DeployToMods=false 可以只编译 -->
-  <Target Name="ToMods" AfterTargets="Build" Condition="'$(DeployToMods)' != 'false'">
-    <Copy SourceFiles="$(TargetPath);manifest.xml" DestinationFolder="$(GameModsDir)\TooltipBars" />
-    <Copy SourceFiles="@(ModLocalization)" DestinationFolder="$(GameModsDir)\TooltipBars\Localization" Condition="'@(ModLocalization)' != ''" />
-  </Target>
-
 </Project>

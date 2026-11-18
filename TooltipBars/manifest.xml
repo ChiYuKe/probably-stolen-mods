@@ -4,7 +4,7 @@
   <Name>提示框实心进度条</Name>
   <Author>Liukeyu</Author>
   <ModVersion>0.1</ModVersion>
-  <Description>把物品提示里的 [====] 文字进度条换成真正的 UI 进度条：上面盖一条底槽 + 填充的 Image，水量、耐久、电量、机器进度等都适用，颜色沿用原来的进度颜色。</Description>
+  <Description>把物品提示里的 [====] 文字进度条换成工业风像素刻度条，适用于水量、耐久、电量和机器进度等提示。</Description>
   <GameVersions>
     <Version>0.46</Version>
   </GameVersions>

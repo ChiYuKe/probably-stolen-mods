@@ -6,7 +6,7 @@ using UnityEngine;
 namespace TooltipBars
 {
     // 工具提示用的是 RichTextElement，显示时走 OverlayHandler.ShowTooltip；
-    // 挂上组件后由它自己在 LateUpdate 里画 Image 进度条。
+    // 挂上组件后由它在 LateUpdate 里绘制进度条。
     [HarmonyPatch(typeof(OverlayHandler))]
     [HarmonyPatch("ShowTooltip", new Type[] { typeof(Vector2), typeof(Vector2), typeof(RichText), typeof(int) })]
     internal static class TooltipShowPatch

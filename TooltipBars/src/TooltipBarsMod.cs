@@ -5,8 +5,7 @@ using UnityEngine;
 namespace TooltipBars
 {
     /// <summary>
-    /// 把游戏里 [====] 这种文字进度条换成真正的 UI Image 进度条。
-    /// 不改文字内容，只在工具提示的 TMP 文本上盖一层底槽 + 填充。
+    /// 把工具提示里的 [====] 文字进度条绘制成像素刻度条。
     /// </summary>
     public class TooltipBarsMod : IMod
     {

@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace TooltipBars
 {
     /// <summary>
-    /// 在工具提示的 TMP 文本上盖真正的 UI Image 进度条：
-    /// 先把原来的 [====] 字符顶点透明掉，再按字符坐标画一条细的底槽 + 填充。
+    /// 隐藏工具提示里的 [====] 字符，按原字符坐标绘制像素进度条。
     /// </summary>
     public sealed class TooltipBarOverlay : MonoBehaviour
     {
@@ -17,14 +15,6 @@ namespace TooltipBars
 
         private static readonly FieldInfo TextNodeField = typeof(RichTextElement).GetField(
             "textNode", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        private sealed class BarVisual
-        {
-            public RectTransform Root;
-            public Image Border;
-            public Image Track;
-            public Image Fill;
-        }
 
         private struct BarData
         {
@@ -34,9 +24,8 @@ namespace TooltipBars
             public Color FillColor;
         }
 
-        private static Sprite whiteSprite;
 
-        private readonly List<BarVisual> visuals = new List<BarVisual>();
+        private readonly List<TooltipBarGraphic> visuals = new List<TooltipBarGraphic>();
         private readonly List<BarData> bars = new List<BarData>();
 
         private TMP_Text text;
@@ -138,11 +127,12 @@ namespace TooltipBars
             if (string.IsNullOrEmpty(text.text))
             {
                 HideAll();
+                lastText = null;
                 return;
             }
 
             Vector2 size = text.rectTransform.rect.size;
-            if (text.text == lastText && size == lastSize)
+            if (text.text == lastText && size == lastSize && !text.havePropertiesChanged)
             {
                 return;
             }
@@ -170,7 +160,7 @@ namespace TooltipBars
 
             for (int i = bars.Count; i < visuals.Count; i++)
             {
-                visuals[i].Root.gameObject.SetActive(false);
+                visuals[i].gameObject.SetActive(false);
             }
         }
 
@@ -187,7 +177,8 @@ namespace TooltipBars
             int count = info.characterCount;
             for (int i = 0; i < count; i++)
             {
-                if (info.characterInfo[i].character != '[')
+                TMP_CharacterInfo open = info.characterInfo[i];
+                if (open.character != '[' || !open.isVisible)
                 {
                     continue;
                 }
@@ -217,7 +208,8 @@ namespace TooltipBars
                     j++;
                 }
 
-                if (!valid || j >= count)
+                if (!valid || j >= count || !info.characterInfo[j].isVisible ||
+                    info.characterInfo[j].lineNumber != open.lineNumber)
                 {
                     continue;
                 }
@@ -233,7 +225,7 @@ namespace TooltipBars
                     First = i,
                     Last = j,
                     Ratio = (float)filled / total,
-                    FillColor = ReadFillColor(info.characterInfo[i])
+                    FillColor = ReadFillColor(open)
                 };
 
                 bars.Add(bar);
@@ -287,7 +279,7 @@ namespace TooltipBars
                     int material = character.materialReferenceIndex;
                     int vertex = character.vertexIndex;
 
-                    if (material < 0 || material >= info.meshInfo.Length || vertex < 0)
+                    if (!character.isVisible || material < 0 || material >= info.meshInfo.Length || vertex < 0)
                     {
                         continue;
                     }
@@ -347,31 +339,16 @@ namespace TooltipBars
             float height = Mathf.Clamp(glyphHeight * 0.70f, 8f, 14f);
             float y = glyphBottom + (glyphHeight - height) * 0.5f;
 
-            BarVisual visual = GetVisual(index);
-            RectTransform root = visual.Root;
+            TooltipBarGraphic visual = GetVisual(index);
+            RectTransform root = visual.rectTransform;
             root.localPosition = new Vector3(x0, y, 0f);
             root.sizeDelta = new Vector2(width, height);
 
-            // 颜色贴着游戏提示框：进度色做填充，底槽和边框压暗，不再用浅色大框
-            Color fill = bar.FillColor;
-            visual.Border.color = Color.Lerp(fill, Color.black, 0.55f);
-            visual.Track.color = Color.Lerp(fill, new Color(0.10f, 0.09f, 0.14f), 0.82f);
-            visual.Fill.color = fill;
-
-            visual.Track.rectTransform.anchoredPosition = new Vector2(1f, 1f);
-            visual.Track.rectTransform.sizeDelta = new Vector2(
-                Mathf.Max(0f, width - 2f),
-                Mathf.Max(0f, height - 2f));
-
-            visual.Fill.rectTransform.anchoredPosition = Vector2.zero;
-            visual.Fill.rectTransform.sizeDelta = new Vector2(
-                Mathf.Max(0f, (width - 2f) * bar.Ratio),
-                Mathf.Max(0f, height - 2f));
-
+            visual.SetProgress(bar.Ratio, bar.FillColor);
             root.gameObject.SetActive(true);
         }
 
-        private BarVisual GetVisual(int index)
+        private TooltipBarGraphic GetVisual(int index)
         {
             while (visuals.Count <= index)
             {
@@ -381,66 +358,28 @@ namespace TooltipBars
             return visuals[index];
         }
 
-        private BarVisual CreateVisual()
+        private TooltipBarGraphic CreateVisual()
         {
-            if (whiteSprite == null)
-            {
-                whiteSprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 1f, 1f),
-                    new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
-                whiteSprite.name = "TooltipBarWhite";
-            }
-
-            GameObject rootObject = new GameObject("TooltipProgressBar", typeof(RectTransform), typeof(Image));
+            GameObject rootObject = new GameObject("TooltipProgressBar", typeof(RectTransform),
+                typeof(TooltipBarGraphic));
             RectTransform root = (RectTransform)rootObject.transform;
             root.SetParent(transform, false);
-            root.anchorMin = new Vector2(0f, 0f);
-            root.anchorMax = new Vector2(0f, 0f);
-            root.pivot = new Vector2(0f, 0f);
-            root.localScale = Vector3.one;
-            root.localRotation = Quaternion.identity;
+            root.anchorMin = Vector2.zero;
+            root.anchorMax = Vector2.zero;
+            root.pivot = Vector2.zero;
 
-            Image border = rootObject.GetComponent<Image>();
-            border.sprite = whiteSprite;
-            border.type = Image.Type.Simple;
-            border.raycastTarget = false;
-
-            Image track = CreateLayer(root, "Track");
-            Image fill = CreateLayer(track.rectTransform, "Fill");
-
-            return new BarVisual
-            {
-                Root = root,
-                Border = border,
-                Track = track,
-                Fill = fill
-            };
-        }
-
-        private static Image CreateLayer(RectTransform parent, string name)
-        {
-            GameObject layerObject = new GameObject(name, typeof(RectTransform), typeof(Image));
-            RectTransform rect = (RectTransform)layerObject.transform;
-            rect.SetParent(parent, false);
-            rect.anchorMin = new Vector2(0f, 0f);
-            rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0f, 0f);
-            rect.localScale = Vector3.one;
-            rect.localRotation = Quaternion.identity;
-
-            Image image = layerObject.GetComponent<Image>();
-            image.sprite = whiteSprite;
-            image.type = Image.Type.Simple;
-            image.raycastTarget = false;
-            return image;
+            TooltipBarGraphic graphic = rootObject.GetComponent<TooltipBarGraphic>();
+            graphic.raycastTarget = false;
+            return graphic;
         }
 
         private void HideAll()
         {
             for (int i = 0; i < visuals.Count; i++)
             {
-                if (visuals[i] != null && visuals[i].Root != null)
+                if (visuals[i] != null)
                 {
-                    visuals[i].Root.gameObject.SetActive(false);
+                    visuals[i].gameObject.SetActive(false);
                 }
             }
         }
