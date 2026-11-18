@@ -21,7 +21,7 @@ namespace NeteaseCassette
                 return;
             }
 
-            var builder = CustomUIManager.Window(WindowId, "歌词设置");
+            var builder = CustomUIManager.Window(WindowId, Loc.T("lyrics_title"));
             if (builder == null) return;
             window = builder.Handle;
 
@@ -31,15 +31,15 @@ namespace NeteaseCassette
                 .SetCloseOnEscape(true)
                 .Center();
 
-            builder.AddLabel("字号");
+            builder.AddLabel(Loc.T("lbl_font_size"));
             builder.BeginRow();
-            builder.AddButton("小一点", () => { Lyrics.ChangeFontSize(-2f); Refresh(); });
+            builder.AddButton(Loc.T("btn_smaller"), () => { Lyrics.ChangeFontSize(-2f); Refresh(); });
             builder.AddSpace(6f);
-            builder.AddButton("大一点", () => { Lyrics.ChangeFontSize(2f); Refresh(); });
+            builder.AddButton(Loc.T("btn_bigger"), () => { Lyrics.ChangeFontSize(2f); Refresh(); });
             builder.End();
 
             builder.AddSpace(4f);
-            builder.AddLabel("当前句颜色");
+            builder.AddLabel(Loc.T("lbl_color"));
             builder.BeginRow(4f);
             for (int i = 0; i < Lyrics.ColorNames.Length; i++)
             {
@@ -50,18 +50,18 @@ namespace NeteaseCassette
             builder.End();
 
             builder.AddSpace(4f);
-            builder.AddLabel("位置");
+            builder.AddLabel(Loc.T("lbl_position"));
             builder.BeginRow();
-            builder.AddButton("锁定位置", () => { Lyrics.ToggleLock(); Refresh(); }, LockId);
+            builder.AddButton(Loc.T("btn_lock"), () => { Lyrics.ToggleLock(); Refresh(); }, LockId);
             builder.AddSpace(6f);
-            builder.AddButton("回到默认位置", () => { Lyrics.ResetPosition(); Refresh(); });
+            builder.AddButton(Loc.T("btn_reset_pos"), () => { Lyrics.ResetPosition(); Refresh(); });
             builder.End();
 
             builder.AddSpace(6f);
             builder.AddLabel(" ", StatusId);
             builder.BeginRow();
             builder.AddFlexibleSpace();
-            builder.AddButton("关闭", () => CustomUIManager.Instance?.CloseWindow(WindowId));
+            builder.AddButton(Loc.T("btn_close"), () => CustomUIManager.Instance?.CloseWindow(WindowId));
             builder.End();
 
             builder.Show();
@@ -86,12 +86,12 @@ namespace NeteaseCassette
         {
             var s = Lyrics.Settings;
             SetText(StatusId, Lyrics.StatusLine());
-            SetText(LockId, s.Locked ? "解锁拖动" : "锁定位置");
+            SetText(LockId, s.Locked ? Loc.T("btn_unlock") : Loc.T("btn_lock"));
 
             for (int i = 0; i < Lyrics.ColorNames.Length; i++)
             {
                 string name = Lyrics.ColorNames[i];
-                SetText(ColorIdPrefix + i, i == s.ColorIndex ? "【" + name + "】" : name);
+                SetText(ColorIdPrefix + i, i == s.ColorIndex ? Loc.T("status_selected", name) : name);
             }
         }
 

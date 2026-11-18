@@ -1,0 +1,105 @@
+cloud_title,NetEase Music · Cassette Deck
+tab_login,Sign in
+btn_search,Search
+tab_playlist,Playlists
+btn_stop,Stop
+btn_close,Close
+btn_prev_page,Prev
+btn_next_page,Next
+pager,Page {0}/{1} · {2} tracks
+empty_list,(empty)
+panel_cloud,NetEase
+login_already,"Signed in. To switch accounts: tap ""Sign out"", then ""Refresh QR code""."
+login_scan_hint,"On your phone: NetEase Cloud Music → ""Scan"" (top right) → scan the code below."
+btn_refresh_qr,Refresh QR code
+btn_sign_out,Sign out
+qr_unused,Signed in — no QR code needed
+qr_requesting,Requesting a QR code…
+qr_fail,Couldn't get a QR code: {0}
+net_down,network unreachable
+qr_render_fail,Couldn't draw the QR code
+qr_waiting,Waiting for scan… (phone: NetEase → Scan)
+qr_waiting_short,Waiting for scan…
+qr_scanned,Scanned — confirm on your phone
+qr_expired,"QR code expired — tap ""Refresh QR code"""
+login_ok,Signed in — you can search now
+signed_out,Signed out
+login_as,Signed in: {0}
+account_anonymous,Not signed in (search and free tracks still work)
+status_not_logged_in,Not signed in.
+client_not_ready,Client not ready
+search_placeholder,"Song or artist, then press Enter"
+search_tip,Tap a track: a tape is made → dropped into the deck → starts playing.
+search_empty_kw,Type something first
+search_searching,Searching…
+search_fail,Search failed: {0}
+search_found,Found {0} tracks — tap one to play.
+playlist_tip,"Open a playlist, then tap a track."
+playlist_need_login,Sign in to read your playlists.
+playlist_loading_list,Loading playlists…
+playlist_fail,Couldn't load playlists: {0}
+playlist_count,{0} playlists — open one to see its tracks.
+btn_back_playlists,Back to playlists
+playlist_header,"""{0}""  {1} tracks"
+tracks_count,{0} tracks
+playlist_row,{0} ({1} tracks)
+playlist_loading,"Loading ""{0}""…"
+read_fail,Load failed: {0}
+playlist_loaded,"""{0}"" — {1} tracks."
+deck_missing_full,"Cassette deck not found — load a shop save first (searching still works, but no tapes can be made)"
+deck_missing_hint,Load a shop save first
+bay_missing_short,cassette bay not found
+spawn_fail,Couldn't create the tape — check the log
+deck_full_hint,Deck full — the tape went to storage. Drag it to the deck and press play.
+no_room_short,Deck and storage are full — remove some tapes
+not_in_deck_hint,That tape isn't in the deck (maybe in storage) — drag it in first.
+now_playing,Now playing: {0}
+stopped,Stopped
+mode_seq,In order
+mode_loop,Repeat one
+mode_shuffle,Shuffle
+btn_cloud_word,NC
+tip_cloud,"Sign in to NetEase, turn tracks into tapes, play them here"
+btn_lyrics_word,LRC
+tip_lyrics,Toggle desktop lyrics
+btn_settings_word,SET
+tip_settings,"Lyrics size, color and position"
+tape_name,Music Tape - {0}
+lyrics_title,Lyrics settings
+lbl_font_size,Font size
+btn_smaller,Smaller
+btn_bigger,Bigger
+lbl_color,Current line color
+lbl_position,Position
+btn_lock,Lock position
+btn_unlock,Unlock (drag)
+btn_reset_pos,Reset position
+color_white,White
+color_yellow,Yellow
+color_cyan,Cyan
+color_pink,Pink
+color_green,Green
+lyric_loading,Looking for lyrics…
+lyric_instrumental,Instrumental — no lyrics
+lyric_instrumental_suffix, (instrumental)
+lyric_no_track,Nothing playing from NetEase
+lyric_fail,Couldn't load lyrics: {0}
+err_client_not_ready,client not ready
+err_no_lyrics,couldn't fetch lyrics
+status_locked,position locked
+status_unlocked,drag the lyrics to move
+status_font,{0} pt
+status_selected,[{0}]
+item_tape_name,Music Tape - NetEase
+item_tape_desc,Recorded from NetEase — drop it in the deck to play.
+item_case_name,Tape Case
+item_case_desc,Holds 30 tapes. Double-click to open.
+tip_case_playing,Playing track {0}
+err_client_missing,The NetEase client isn't ready yet
+err_play_flow,Playback failed: {0}
+err_no_url,Couldn't get a playable URL (membership or region restriction)
+err_download,Download failed: {0}
+err_decode,Couldn't decode the audio: {0}
+err_decode_detail,unsupported format or broken download
+err_no_source,Couldn't find the game's music audio source
+err_silent,The track stayed silent (decode failure or unsupported format)

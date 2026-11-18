@@ -18,7 +18,18 @@ namespace NeteaseCassette
         private const string CanvasName = "netease_cassette_lyrics";
         private const string SettingsFile = "lyrics.json";
 
-        public static readonly string[] ColorNames = { "白", "黄", "青", "粉", "绿" };
+        // 每次读都现取，避免静态初始化太早把键名缓存下来
+        public static string[] ColorNames
+        {
+            get
+            {
+                return new[]
+                {
+                    Loc.T("color_white"), Loc.T("color_yellow"), Loc.T("color_cyan"),
+                    Loc.T("color_pink"), Loc.T("color_green")
+                };
+            }
+        }
 
         private static readonly Color[] Colors =
         {
@@ -121,6 +132,7 @@ namespace NeteaseCassette
         {
             EnsureSettings();
             if (!EnsureCanvas()) return;
+            CloudWindow.RefreshLyricButtons();
 
             currentRow = -1;
             needFit = true;
@@ -143,6 +155,7 @@ namespace NeteaseCassette
             textNext = null;
             dragging = false;
             currentRow = -1;
+            CloudWindow.RefreshLyricButtons();
         }
 
         public static void Shutdown()
@@ -234,8 +247,8 @@ namespace NeteaseCassette
         {
             var s = Settings;
             string color = ColorNames[Mathf.Clamp(s.ColorIndex, 0, ColorNames.Length - 1)];
-            string pos = s.Locked ? "位置已锁定" : "点歌词本身可以拖";
-            return Mathf.RoundToInt(s.FontSize) + " 号 · " + color + " · " + pos;
+            string pos = s.Locked ? Loc.T("status_locked") : Loc.T("status_unlocked");
+            return Loc.T("status_font", Mathf.RoundToInt(s.FontSize)) + " · " + color + " · " + pos;
         }
 
         private static void EnsureSettings()
@@ -509,7 +522,7 @@ namespace NeteaseCassette
         {
             if (ModEntry.Client == null)
             {
-                loadError = "客户端没准备好";
+                loadError = Loc.T("err_client_not_ready");
                 Render(true);
                 yield break;
             }
@@ -522,7 +535,7 @@ namespace NeteaseCassette
 
             if (error != null || lyric == null)
             {
-                loadError = error ?? "拿不到歌词";
+                loadError = error ?? Loc.T("err_no_lyrics");
                 rows = new List<Row>();
                 Render(true);
                 yield break;
@@ -720,22 +733,22 @@ namespace NeteaseCassette
 
             if (StreamPlayer.CurrentSongId <= 0)
             {
-                current = "没有在放网易云";
+                current = Loc.T("lyric_no_track");
                 return;
             }
             if (!string.IsNullOrEmpty(loadError))
             {
-                current = "歌词没拿到：" + loadError;
+                current = Loc.T("lyric_fail", loadError);
                 return;
             }
             if (instrumental)
             {
-                current = string.IsNullOrEmpty(songName) ? "纯音乐，没有歌词" : songName + "（纯音乐）";
+                current = string.IsNullOrEmpty(songName) ? Loc.T("lyric_instrumental") : songName + Loc.T("lyric_instrumental_suffix");
                 return;
             }
             if (rows.Count == 0)
             {
-                current = "正在找歌词…";
+                current = Loc.T("lyric_loading");
                 return;
             }
 

@@ -23,9 +23,8 @@ namespace NeteaseCassette
         private static int trackPage;
         private static readonly Dictionary<string, Sprite> scaledSprites = new Dictionary<string, Sprite>();
         private static MachineryButton[] modeButtons;
-        private static MachineryButton lyricButton;
-        private static Sprite lyricOn;
-        private static Sprite lyricOff;
+        private static readonly List<(WeakReference<MachineryButton> Button, Sprite On, Sprite Off)> lyricButtons
+            = new List<(WeakReference<MachineryButton>, Sprite, Sprite)>();
         private static Sprite[] modeIcons;
         private static Sprite[] modeDim;
         private static RectTransform searchHost;
@@ -50,7 +49,7 @@ namespace NeteaseCassette
             Build();
             if (EmporiumEntry.Instance == null || EmporiumEntry.Instance.cassettePlayer == null)
             {
-                ShowStatus("没找到磁带机：要先载入店铺存档（现在只能搜歌，不能生成磁带）");
+                ShowStatus(Loc.T("deck_missing_full"));
             }
         }
 
@@ -72,7 +71,7 @@ namespace NeteaseCassette
 
         private static void Build()
         {
-            var builder = CustomUIManager.Window(WindowId, "网易云音乐 · 磁带机");
+            var builder = CustomUIManager.Window(WindowId, Loc.T("cloud_title"));
             if (builder == null) return;
             window = builder.Handle;
 
@@ -91,11 +90,11 @@ namespace NeteaseCassette
             builder.BeginTabs();
 
             // 扫码
-            builder.BeginTab("扫码登录");
+            builder.BeginTab(Loc.T("tab_login"));
             builder.AddLabel(
                 loggedIn
-                    ? "已经登录。想换账号：先点「退出登录」，再点「刷新二维码」。"
-                    : "手机网易云音乐 → 右上角「扫一扫」→ 扫下面的二维码。",
+                    ? Loc.T("login_already")
+                    : Loc.T("login_scan_hint"),
                 "login_hint");
             builder.AddSpace(2f);
             builder.BeginRow(4f, TextAnchor.MiddleCenter);
@@ -106,29 +105,29 @@ namespace NeteaseCassette
             builder.AddLabel(" ", LoginStatusId);
             builder.AddSpace(2f);
             builder.BeginRow();
-            builder.AddButton("刷新二维码", RefreshQr);
+            builder.AddButton(Loc.T("btn_refresh_qr"), RefreshQr);
             builder.AddSpace(8f);
-            builder.AddButton("退出登录", Logout);
+            builder.AddButton(Loc.T("btn_sign_out"), Logout);
             builder.AddFlexibleSpace();
             builder.End();
             builder.End();
 
             // 搜索
-            builder.BeginTab("搜索");
+            builder.BeginTab(Loc.T("btn_search"));
             builder.BeginRow();
-            builder.AddInput("输入歌名 / 歌手，回车搜索", lastKeyword, value => lastKeyword = value);
+            builder.AddInput(Loc.T("search_placeholder"), lastKeyword, value => lastKeyword = value);
             builder.AddSpace(8f);
-            builder.AddButton("搜索", () => StartSearch(lastKeyword));
+            builder.AddButton(Loc.T("btn_search"), () => StartSearch(lastKeyword));
             builder.End();
-            builder.AddLabel("点一首歌：生成磁带 → 丢进播放器 → 直接开播。", SearchStatusId);
+            builder.AddLabel(Loc.T("search_tip"), SearchStatusId);
             builder.BeginScrollFlexible(380f);
             searchHost = builder.CurrentContainer;
             builder.End();
             builder.End();
 
             // 歌单
-            builder.BeginTab("歌单");
-            builder.AddLabel(loggedIn ? "点开歌单，再点曲目。" : "扫码登录后才能读你的歌单。", PlaylistStatusId);
+            builder.BeginTab(Loc.T("tab_playlist"));
+            builder.AddLabel(loggedIn ? Loc.T("playlist_tip") : Loc.T("playlist_need_login"), PlaylistStatusId);
             builder.BeginScrollFlexible(420f);
             playlistHost = builder.CurrentContainer;
             builder.End();
@@ -139,9 +138,9 @@ namespace NeteaseCassette
             builder.AddLabel(" ", NowPlayingId);
             builder.BeginRow();
             builder.AddFlexibleSpace();
-            builder.AddButton("停止", StopPlayback);
+            builder.AddButton(Loc.T("btn_stop"), StopPlayback);
             builder.AddSpace(8f);
-            builder.AddButton("关闭", Close);
+            builder.AddButton(Loc.T("btn_close"), Close);
             builder.End();
 
             builder.Show();
@@ -152,13 +151,13 @@ namespace NeteaseCassette
             FillSearch();
             if (loggedIn)
             {
-                SetText(LoginStatusId, "已登录，二维码用不上了");
+                SetText(LoginStatusId, Loc.T("qr_unused"));
                 FillPlaylists();
                 LoadPlaylists();
             }
             else
             {
-                FillPlaylistMessage("未登录。");
+                FillPlaylistMessage(Loc.T("status_not_logged_in"));
                 RefreshQr();
             }
         }
@@ -166,10 +165,10 @@ namespace NeteaseCassette
         private static string AccountLine()
         {
             var client = ModEntry.Client;
-            if (client == null) return "客户端未就绪";
-            if (!client.IsLoggedIn) return "未登录（不登录也能搜歌、放免费歌）";
+            if (client == null) return Loc.T("client_not_ready");
+            if (!client.IsLoggedIn) return Loc.T("account_anonymous");
             string name = string.IsNullOrEmpty(client.Nickname) ? ("UID " + client.UserId) : client.Nickname;
-            return "已登录：" + name;
+            return Loc.T("login_as", name);
         }
 
         // 控件小工具
@@ -253,7 +252,7 @@ namespace NeteaseCassette
             var client = ModEntry.Client;
             if (client == null)
             {
-                ShowStatus("客户端未就绪");
+                ShowStatus(Loc.T("client_not_ready"));
                 return;
             }
             if (client.IsLoggedIn)
@@ -262,7 +261,7 @@ namespace NeteaseCassette
                 return;
             }
             int generation = ++qrGeneration;
-            SetText(LoginStatusId, "正在向网易云要二维码…");
+            SetText(LoginStatusId, Loc.T("qr_requesting"));
             ModHelper.StartCoroutine(ModEntry.ModId, QrRoutine(generation));
         }
 
@@ -275,7 +274,7 @@ namespace NeteaseCassette
 
             if (string.IsNullOrEmpty(unikey))
             {
-                SetText(LoginStatusId, "要二维码失败：" + (error ?? "网络不通"));
+            SetText(LoginStatusId, Loc.T("qr_fail", error ?? Loc.T("net_down")));
                 yield break;
             }
 
@@ -290,14 +289,14 @@ namespace NeteaseCassette
             }
             if (matrix == null)
             {
-                SetText(LoginStatusId, "二维码生成失败");
+                SetText(LoginStatusId, Loc.T("qr_render_fail"));
                 yield break;
             }
 
             var sprite = QrSprite.Create(matrix, 7, 4);
             SetSprite(QrElementId, sprite);
             SetVisible(QrElementId, true);
-            SetText(LoginStatusId, "等待扫码…（手机网易云 → 扫一扫）");
+            SetText(LoginStatusId, Loc.T("qr_waiting"));
 
             while (generation == qrGeneration)
             {
@@ -313,18 +312,18 @@ namespace NeteaseCassette
                         ModEntry.Log?.Log("扫码登录成功：" + ModEntry.Client.Nickname);
                         SetText(LoginStatusId, AccountLine());
                         SetText(AccountId, AccountLine());
-                        ShowStatus("登录成功，可以搜歌了");
+                        ShowStatus(Loc.T("login_ok"));
                         FillPlaylists();
                         LoadPlaylists();
                         yield break;
                     case NeteaseClient.QrExpired:
-                        SetText(LoginStatusId, "二维码过期了，点「刷新二维码」再来一次");
+                        SetText(LoginStatusId, Loc.T("qr_expired"));
                         yield break;
                     case NeteaseClient.QrScanned:
-                        SetText(LoginStatusId, "已扫码，在手机上点「确认登录」");
+                        SetText(LoginStatusId, Loc.T("qr_scanned"));
                         break;
                     default:
-                        SetText(LoginStatusId, string.IsNullOrEmpty(message) ? "等待扫码…" : message);
+                        SetText(LoginStatusId, string.IsNullOrEmpty(message) ? Loc.T("qr_waiting_short") : message);
                         break;
                 }
 
@@ -348,8 +347,8 @@ namespace NeteaseCassette
             playlistSongs.Clear();
             currentPlaylist = null;
             SetText(AccountId, AccountLine());
-            SetText(LoginStatusId, "已退出登录");
-            FillPlaylistMessage("未登录。");
+            SetText(LoginStatusId, Loc.T("signed_out"));
+            FillPlaylistMessage(Loc.T("status_not_logged_in"));
         }
 
         // 搜索
@@ -359,12 +358,12 @@ namespace NeteaseCassette
             keyword = (keyword ?? string.Empty).Trim();
             if (keyword.Length == 0)
             {
-                SetText(SearchStatusId, "先输点关键词");
+                SetText(SearchStatusId, Loc.T("search_empty_kw"));
                 return;
             }
             if (ModEntry.Client == null) return;
             lastKeyword = keyword;
-            SetText(SearchStatusId, "搜索中…");
+            SetText(SearchStatusId, Loc.T("search_searching"));
             ModHelper.StartCoroutine(ModEntry.ModId, SearchRoutine(keyword));
         }
 
@@ -375,12 +374,12 @@ namespace NeteaseCassette
             yield return ModEntry.Client.Search(keyword, 30, songs => result = songs, message => error = message);
             if (!string.IsNullOrEmpty(error))
             {
-                SetText(SearchStatusId, "搜索失败：" + error);
+                SetText(SearchStatusId, Loc.T("search_fail", error));
                 yield break;
             }
             searchSongs = result ?? new List<NcSong>();
             searchPage = 0;
-            SetText(SearchStatusId, "找到 " + searchSongs.Count + " 首，点一首就开始放。");
+                SetText(SearchStatusId, Loc.T("search_found", searchSongs.Count));
             FillSearch();
         }
 
@@ -393,7 +392,7 @@ namespace NeteaseCassette
                 var builder = new CustomUIBuilder(CustomUIManager.Instance, window, searchHost);
                 if (searchSongs.Count == 0)
                 {
-                    builder.AddLabel("（空）");
+                    builder.AddLabel(Loc.T("empty_list"));
                 }
                 else
                 {
@@ -424,7 +423,7 @@ namespace NeteaseCassette
         private static void LoadPlaylists()
         {
             if (ModEntry.Client == null || !ModEntry.Client.IsLoggedIn) return;
-            SetText(PlaylistStatusId, "读取歌单中…");
+            SetText(PlaylistStatusId, Loc.T("playlist_loading_list"));
             ModHelper.StartCoroutine(ModEntry.ModId, PlaylistRoutine());
         }
 
@@ -435,13 +434,13 @@ namespace NeteaseCassette
             yield return ModEntry.Client.GetPlaylists(lists => result = lists, message => error = message);
             if (!string.IsNullOrEmpty(error))
             {
-                SetText(PlaylistStatusId, "读歌单失败：" + error);
+            SetText(PlaylistStatusId, Loc.T("playlist_fail", error));
                 yield break;
             }
             playlists = result ?? new List<NcPlaylist>();
             currentPlaylist = null;
             trackPage = 0;
-            SetText(PlaylistStatusId, "共 " + playlists.Count + " 个歌单，点进去看曲目。");
+            SetText(PlaylistStatusId, Loc.T("playlist_count", playlists.Count));
             FillPlaylists();
         }
 
@@ -454,13 +453,13 @@ namespace NeteaseCassette
                 var builder = new CustomUIBuilder(CustomUIManager.Instance, window, playlistHost);
                 if (currentPlaylist != null)
                 {
-                    builder.AddButton("返回歌单列表", () =>
+                    builder.AddButton(Loc.T("btn_back_playlists"), () =>
                     {
                         currentPlaylist = null;
                         trackPage = 0;
                         FillPlaylists();
                     });
-                    builder.AddLabel("《" + Fit(Clean(currentPlaylist.Name), 44) + "》  " + playlistSongs.Count + " 首");
+                    builder.AddLabel(Loc.T("playlist_header", Fit(Clean(currentPlaylist.Name), 44), playlistSongs.Count));
                     int pages = Mathf.Max(1, (playlistSongs.Count + PageSize - 1) / PageSize);
                     trackPage = Mathf.Clamp(trackPage, 0, pages - 1);
                     int start = trackPage * PageSize;
@@ -479,14 +478,14 @@ namespace NeteaseCassette
                 {
                     if (playlists.Count == 0)
                     {
-                        builder.AddLabel("（空）");
+                        builder.AddLabel(Loc.T("empty_list"));
                     }
                     foreach (var item in playlists)
                     {
                         var playlist = item;
-                        string label = (playlist.IsLiked ? "♥ " : "") + Clean(playlist.Name) + "   (" + playlist.TrackCount + " 首)";
+                string label = (playlist.IsLiked ? "♥ " : "") + Clean(playlist.Name) + "   (" + Loc.T("tracks_count", playlist.TrackCount) + ")";
                         builder.AddButton(Fit(label, 62), () => OpenPlaylist(playlist));
-                        builder.WithTooltip(Clean(playlist.Name) + "（" + playlist.TrackCount + " 首）");
+                builder.WithTooltip(Loc.T("playlist_row", Clean(playlist.Name), playlist.TrackCount));
                     }
                 }
                 CustomUIBuilder.RebuildLayout(playlistHost);
@@ -517,7 +516,7 @@ namespace NeteaseCassette
         {
             if (ModEntry.Client == null) return;
             currentPlaylist = playlist;
-            SetText(PlaylistStatusId, "读取《" + playlist.Name + "》…");
+            SetText(PlaylistStatusId, Loc.T("playlist_loading", playlist.Name));
             ModHelper.StartCoroutine(ModEntry.ModId, TracksRoutine(playlist));
         }
 
@@ -529,12 +528,12 @@ namespace NeteaseCassette
             if (currentPlaylist == null || currentPlaylist.Id != playlist.Id) yield break;
             if (!string.IsNullOrEmpty(error))
             {
-                SetText(PlaylistStatusId, "读取失败：" + error);
+            SetText(PlaylistStatusId, Loc.T("read_fail", error));
                 yield break;
             }
             playlistSongs = result ?? new List<NcSong>();
             trackPage = 0;
-            SetText(PlaylistStatusId, "《" + playlist.Name + "》共 " + playlistSongs.Count + " 首。");
+            SetText(PlaylistStatusId, Loc.T("playlist_loaded", playlist.Name, playlistSongs.Count));
             FillPlaylists();
         }
 
@@ -548,7 +547,7 @@ namespace NeteaseCassette
             if (machine == null)
             {
                 ModEntry.Log?.Warning("点歌失败：磁带机不在");
-                ShowStatus("要先载入店铺存档，磁带机才在");
+                ShowStatus(Loc.T("deck_missing_hint"));
                 return;
             }
 
@@ -556,7 +555,7 @@ namespace NeteaseCassette
             if (deck == null)
             {
                 ModEntry.Log?.Warning("点歌失败：找不到磁带仓");
-                ShowStatus("找不到磁带仓");
+                ShowStatus(Loc.T("bay_missing_short"));
                 return;
             }
 
@@ -573,7 +572,7 @@ namespace NeteaseCassette
                 cassette = CreateCassette(song, trackId);
                 if (cassette == null)
                 {
-                    ShowStatus("生成磁带失败，看日志");
+                    ShowStatus(Loc.T("spawn_fail"));
                     return;
                 }
                 // TryAcceptAll 返回的是「没塞进去的数量」，不是塞进去的数量，别拿它判断成败。
@@ -589,12 +588,12 @@ namespace NeteaseCassette
                     if (cassette.parentInventory != null)
                     {
                         ModEntry.Log?.Log("磁带仓满了，磁带放进储藏格");
-                        ShowStatus("磁带仓满了，这盘先放进储藏格了，拖到「磁带」格再点播放");
+                        ShowStatus(Loc.T("deck_full_hint"));
                         RefreshDeck(machine);
                         return;
                     }
                     ModEntry.Log?.Warning("点歌失败：磁带仓和储藏格都塞不下");
-                    ShowStatus("磁带仓和储藏格都塞不下，先清几盘");
+                    ShowStatus(Loc.T("no_room_short"));
                     try
                     {
                         cassette.Destroy();
@@ -612,14 +611,14 @@ namespace NeteaseCassette
             if (index < 0)
             {
                 ModEntry.Log?.Warning("点歌失败：磁带不在播放仓里 trackId=" + trackId);
-                ShowStatus("这盘磁带不在播放仓里（可能在储藏格），先拖进来");
+                ShowStatus(Loc.T("not_in_deck_hint"));
                 RefreshDeck(machine);
                 return;
             }
 
             StartTrack(machine, deck, trackId, index);
             SetText(NowPlayingId, "▶ " + Clean(song.Display));
-            ShowStatus("正在播放：" + Clean(song.Display));
+            ShowStatus(Loc.T("now_playing", Clean(song.Display)));
         }
 
         private static GameItem CreateCassette(NcSong song, string trackId)
@@ -632,7 +631,7 @@ namespace NeteaseCassette
                 ModEntry.Log?.Warning("云磁带物品没注册上，SpawnItem 返回 null");
                 return null;
             }
-            cassette.name = "音乐磁带 - " + Clean(song.Display);
+            cassette.name = Loc.T("tape_name", Clean(song.Display));
             CassetteHelper.InitCassetteItem(cassette, trackId);
             ModHelper.SetItemOwnerShip(cassette, true);
             ModEntry.Log?.Log("生成磁带 id=" + cassette.identifier + " uniqueId=" + cassette.uniqueId + " 曲目=" + trackId);
@@ -678,7 +677,7 @@ namespace NeteaseCassette
                     RefreshDeck(machine);
                 }
                 SetText(NowPlayingId, " ");
-                ShowStatus("已停止");
+                ShowStatus(Loc.T("stopped"));
             }
             catch (Exception e)
             {
@@ -703,7 +702,7 @@ namespace NeteaseCassette
         private static MachineryStack BuildModeRow(int size)
         {
             string[] keys = { "mode_seq", "mode_loop", "mode_shuffle" };
-            string[] labels = { "顺序播放", "单曲循环", "随机播放" };
+            string[] labels = { Loc.T("mode_seq"), Loc.T("mode_loop"), Loc.T("mode_shuffle") };
             int[] values = { PlaybackMode.Sequential, PlaybackMode.Loop, PlaybackMode.Shuffle };
 
             modeButtons = new MachineryButton[3];
@@ -770,29 +769,35 @@ namespace NeteaseCassette
             MachineryButton button;
             if (source == null)
             {
-                button = new MachineryButton("词", ToggleLyrics);
+                button = new MachineryButton(Loc.T("btn_lyrics_word"), Lyrics.Toggle);
             }
             else
             {
-                lyricOn = ScaleSprite("icon_lyrics", source, size, 1f);
-                lyricOff = ScaleSprite("icon_lyrics", source, size, 0.45f);
-                button = new MachineryButton(lyricOn, ToggleLyrics, size);
+                Sprite on = ScaleSprite("icon_lyrics", source, size, 1f);
+                Sprite off = ScaleSprite("icon_lyrics", source, size, 0.45f);
+                button = new MachineryButton(Lyrics.IsOpen ? on : off, Lyrics.Toggle, size);
+                lyricButtons.RemoveAll(entry => !entry.Button.TryGetTarget(out var existing) || existing.handler == null);
+                lyricButtons.Add((new WeakReference<MachineryButton>(button), on, off));
             }
-            button.SetDescription("开关桌面歌词");
-            lyricButton = button;
+            button.SetDescription(Loc.T("tip_lyrics"));
             return button;
         }
 
-        private static void ToggleLyrics()
+        internal static void RefreshLyricButtons()
         {
-            Lyrics.Toggle();
-            RefreshLyricButton();
-        }
+            bool isOpen = Lyrics.IsOpen;
+            for (int i = lyricButtons.Count - 1; i >= 0; i--)
+            {
+                var entry = lyricButtons[i];
+                if (!entry.Button.TryGetTarget(out var button) || button.handler == null)
+                {
+                    lyricButtons.RemoveAt(i);
+                    continue;
+                }
 
-        private static void RefreshLyricButton()
-        {
-            if (lyricButton == null || lyricOn == null || lyricOff == null) return;
-            lyricButton.SetIcon(Lyrics.IsOpen ? lyricOn : lyricOff);
+                Sprite icon = isOpen ? entry.On : entry.Off;
+                if (button.icon != icon) button.SetIcon(icon);
+            }
         }
 
         // 把 32px 的图标缩到跟原版按钮一样大，顺便压暗（tint < 1）
@@ -894,13 +899,13 @@ namespace NeteaseCassette
             }
             ModEntry.Log?.Log("按钮按 " + transportSize + "px 排");
 
-            var button = MakeIconButton("icon_netease", "云", Open, transportSize);
-            button.SetDescription("扫码登录网易云，点歌变成磁带，用这台机器播放");
+            var button = MakeIconButton("icon_netease", Loc.T("btn_cloud_word"), Open, transportSize);
+            button.SetDescription(Loc.T("tip_cloud"));
 
             var lyricBtn = MakeLyricButton(transportSize);
 
-            var lyricSetButton = MakeIconButton("icon_settings", "设", LyricPanel.Open, transportSize);
-            lyricSetButton.SetDescription("歌词的字号、颜色和位置");
+            var lyricSetButton = MakeIconButton("icon_settings", Loc.T("btn_settings_word"), LyricPanel.Open, transportSize);
+            lyricSetButton.SetDescription(Loc.T("tip_settings"));
 
             var modeRow = BuildModeRow(transportSize);
             if (stack != null)
@@ -918,12 +923,11 @@ namespace NeteaseCassette
                 var content = MachineryStack.Vertical(
                     MachineryStack.Horizontal(button, lyricBtn, lyricSetButton),
                     modeRow);
-                var panel = new MachineryPanel("网易云", content, "cloud");
+                var panel = new MachineryPanel(Loc.T("panel_cloud"), content, "cloud");
                 row.Add(panel);
                 controls = panel;
             }
             RefreshModeButtons();
-            RefreshLyricButton();
             if (controls != null && controls.role == null)
             {
                 controls.SetRole("cloud");
@@ -947,9 +951,9 @@ namespace NeteaseCassette
             if (pages <= 1) return;
 
             builder.BeginRow();
-            if (page > 0) builder.AddButton("上一页", () => go(page - 1));
-            builder.AddLabel(" 第 " + (page + 1) + "/" + pages + " 页，共 " + total + " 首 ");
-            if (page + 1 < pages) builder.AddButton("下一页", () => go(page + 1));
+            if (page > 0) builder.AddButton(Loc.T("btn_prev_page"), () => go(page - 1));
+            builder.AddLabel(" " + Loc.T("pager", page + 1, pages, total) + " ");
+            if (page + 1 < pages) builder.AddButton(Loc.T("btn_next_page"), () => go(page + 1));
             builder.End();
         }
 

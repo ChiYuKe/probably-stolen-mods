@@ -117,8 +117,8 @@ namespace NeteaseCassette
         private static GameItem CreateCaseTemplate()
         {
             var item = ItemDirectory.CreateEmptyItem(CaseItemId);
-            item.name = "磁盘收纳盒";
-            item.shortDescription = "能塞 30 盘磁带，双击打开。";
+            item.name = Loc.T("item_case_name");
+            item.shortDescription = Loc.T("item_case_desc");
             item.SetSpriteAndShapeFromMod(ModId, "tape_case");
             if (item.shape == null || item.shape.width != 6 || item.shape.height != 2)
             {
@@ -189,7 +189,7 @@ namespace NeteaseCassette
                 int index = PlayingIndexInCase(item);
                 if (index > 0)
                 {
-                    builder.AddLine(" 正在播放第 " + index + " 盘", true, RenderHandler.ColorPalette.LightGreen);
+                    builder.AddLine(" " + Loc.T("tip_case_playing", index), true, RenderHandler.ColorPalette.LightGreen);
                 }
             }
             catch (Exception e)
@@ -262,8 +262,8 @@ namespace NeteaseCassette
         private static GameItem CreateTapeTemplate()
         {
             var item = ItemDirectory.CreateEmptyItem(TapeItemId);
-            item.name = "音乐磁带 - 网易云";
-            item.shortDescription = "从网易云录下来的，塞进磁带机就能放。";
+            item.name = Loc.T("item_tape_name");
+            item.shortDescription = Loc.T("item_tape_desc");
             // 随机贴图，不然几十盘磁带长得一模一样
             EnsureTapeSprites();
             string spriteKey = TapeKey(UnityEngine.Random.Range(1, TapeSpriteCount + 1));

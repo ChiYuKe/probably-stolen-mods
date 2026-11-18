@@ -1,0 +1,105 @@
+cloud_title,網易雲音樂 · 磁帶機
+tab_login,掃碼登入
+btn_search,搜尋
+tab_playlist,歌單
+btn_stop,停止
+btn_close,關閉
+btn_prev_page,上一頁
+btn_next_page,下一頁
+pager,第 {0}/{1} 頁，共 {2} 首
+empty_list,（空）
+panel_cloud,網易雲
+login_already,已經登入。想換賬號：先點「退出登入」，再點「重新整理二維碼」。
+login_scan_hint,手機網易雲音樂 → 右上角「掃一掃」→ 掃下面的二維碼。
+btn_refresh_qr,重新整理二維碼
+btn_sign_out,退出登入
+qr_unused,已登入，二維碼用不上了
+qr_requesting,正在向網易雲要二維碼…
+qr_fail,要二維碼失敗：{0}
+net_down,網路不通
+qr_render_fail,二維碼生成失敗
+qr_waiting,等待掃碼…（手機網易雲 → 掃一掃）
+qr_waiting_short,等待掃碼…
+qr_scanned,已掃碼，在手機上點「確認登入」
+qr_expired,二維碼過期了，點「重新整理二維碼」再來一次
+login_ok,登入成功，可以搜歌了
+signed_out,已退出登入
+login_as,已登入：{0}
+account_anonymous,未登入（不登入也能搜歌、放免費歌）
+status_not_logged_in,未登入。
+client_not_ready,客戶端未就緒
+search_placeholder,輸入歌名 / 歌手，回車搜尋
+search_tip,點一首歌：生成磁帶 → 丟進播放器 → 直接開播。
+search_empty_kw,先輸點關鍵詞
+search_searching,搜尋中…
+search_fail,搜尋失敗：{0}
+search_found,找到 {0} 首，點一首就開始放。
+playlist_tip,點開歌單，再點曲目。
+playlist_need_login,掃碼登入後才能讀你的歌單。
+playlist_loading_list,讀取歌單中…
+playlist_fail,讀歌單失敗：{0}
+playlist_count,共 {0} 個歌單，點進去看曲目。
+btn_back_playlists,返回歌單列表
+playlist_header,《{0}》  {1} 首
+tracks_count,{0} 首
+playlist_row,{0}（{1} 首）
+playlist_loading,讀取《{0}》…
+read_fail,讀取失敗：{0}
+playlist_loaded,《{0}》共 {1} 首。
+deck_missing_full,沒找到磁帶機：要先載入店鋪存檔（現在只能搜歌，不能生成磁帶）
+deck_missing_hint,要先載入店鋪存檔，磁帶機才在
+bay_missing_short,找不到磁帶倉
+spawn_fail,生成磁帶失敗，看日誌
+deck_full_hint,磁帶倉滿了，這盤先放進儲藏格了，拖到「磁帶」格再點播放
+no_room_short,磁帶倉和儲藏格都塞不下，先清幾盤
+not_in_deck_hint,這盤磁帶不在播放倉裡（可能在儲藏格），先拖進來
+now_playing,正在播放：{0}
+stopped,已停止
+mode_seq,順序播放
+mode_loop,單曲迴圈
+mode_shuffle,隨機播放
+btn_cloud_word,雲
+tip_cloud,掃碼登入網易雲，點歌變成磁帶，用這臺機器播放
+btn_lyrics_word,詞
+tip_lyrics,開關桌面歌詞
+btn_settings_word,設
+tip_settings,歌詞的字號、顏色和位置
+tape_name,音樂磁帶 - {0}
+lyrics_title,歌詞設定
+lbl_font_size,字號
+btn_smaller,小一點
+btn_bigger,大一點
+lbl_color,當前句顏色
+lbl_position,位置
+btn_lock,鎖定位置
+btn_unlock,解鎖拖動
+btn_reset_pos,回到預設位置
+color_white,白
+color_yellow,黃
+color_cyan,青
+color_pink,粉
+color_green,綠
+lyric_loading,正在找歌詞…
+lyric_instrumental,純音樂，沒有歌詞
+lyric_instrumental_suffix,（純音樂）
+lyric_no_track,沒有在放網易雲
+lyric_fail,歌詞沒拿到：{0}
+err_client_not_ready,客戶端沒準備好
+err_no_lyrics,拿不到歌詞
+status_locked,位置已鎖定
+status_unlocked,點歌詞本身可以拖
+status_font,{0} 號
+status_selected,【{0}】
+item_tape_name,音樂磁帶 - 網易雲
+item_tape_desc,從網易雲錄下來的，塞進磁帶機就能放。
+item_case_name,磁碟收納盒
+item_case_desc,能塞 30 盤磁帶，雙擊開啟。
+tip_case_playing,正在播放第 {0} 盤
+err_client_missing,網易雲客戶端還沒準備好
+err_play_flow,播放流程出錯：{0}
+err_no_url,拿不到播放地址（可能要會員或版權受限）
+err_download,下載音訊失敗：{0}
+err_decode,音訊解碼失敗：{0}
+err_decode_detail,格式不支援或下載中斷
+err_no_source,找不到遊戲的音樂音源
+err_silent,音訊沒有出聲（可能是解碼失敗或格式不支援）

@@ -1,0 +1,105 @@
+cloud_title,网易云音乐 · 磁带机
+tab_login,扫码登录
+btn_search,搜索
+tab_playlist,歌单
+btn_stop,停止
+btn_close,关闭
+btn_prev_page,上一页
+btn_next_page,下一页
+pager,第 {0}/{1} 页，共 {2} 首
+empty_list,（空）
+panel_cloud,网易云
+login_already,已经登录。想换账号：先点「退出登录」，再点「刷新二维码」。
+login_scan_hint,手机网易云音乐 → 右上角「扫一扫」→ 扫下面的二维码。
+btn_refresh_qr,刷新二维码
+btn_sign_out,退出登录
+qr_unused,已登录，二维码用不上了
+qr_requesting,正在向网易云要二维码…
+qr_fail,要二维码失败：{0}
+net_down,网络不通
+qr_render_fail,二维码生成失败
+qr_waiting,等待扫码…（手机网易云 → 扫一扫）
+qr_waiting_short,等待扫码…
+qr_scanned,已扫码，在手机上点「确认登录」
+qr_expired,二维码过期了，点「刷新二维码」再来一次
+login_ok,登录成功，可以搜歌了
+signed_out,已退出登录
+login_as,已登录：{0}
+account_anonymous,未登录（不登录也能搜歌、放免费歌）
+status_not_logged_in,未登录。
+client_not_ready,客户端未就绪
+search_placeholder,输入歌名 / 歌手，回车搜索
+search_tip,点一首歌：生成磁带 → 丢进播放器 → 直接开播。
+search_empty_kw,先输点关键词
+search_searching,搜索中…
+search_fail,搜索失败：{0}
+search_found,找到 {0} 首，点一首就开始放。
+playlist_tip,点开歌单，再点曲目。
+playlist_need_login,扫码登录后才能读你的歌单。
+playlist_loading_list,读取歌单中…
+playlist_fail,读歌单失败：{0}
+playlist_count,共 {0} 个歌单，点进去看曲目。
+btn_back_playlists,返回歌单列表
+playlist_header,《{0}》  {1} 首
+tracks_count,{0} 首
+playlist_row,{0}（{1} 首）
+playlist_loading,读取《{0}》…
+read_fail,读取失败：{0}
+playlist_loaded,《{0}》共 {1} 首。
+deck_missing_full,没找到磁带机：要先载入店铺存档（现在只能搜歌，不能生成磁带）
+deck_missing_hint,要先载入店铺存档，磁带机才在
+bay_missing_short,找不到磁带仓
+spawn_fail,生成磁带失败，看日志
+deck_full_hint,磁带仓满了，这盘先放进储藏格了，拖到「磁带」格再点播放
+no_room_short,磁带仓和储藏格都塞不下，先清几盘
+not_in_deck_hint,这盘磁带不在播放仓里（可能在储藏格），先拖进来
+now_playing,正在播放：{0}
+stopped,已停止
+mode_seq,顺序播放
+mode_loop,单曲循环
+mode_shuffle,随机播放
+btn_cloud_word,云
+tip_cloud,扫码登录网易云，点歌变成磁带，用这台机器播放
+btn_lyrics_word,词
+tip_lyrics,开关桌面歌词
+btn_settings_word,设
+tip_settings,歌词的字号、颜色和位置
+tape_name,音乐磁带 - {0}
+lyrics_title,歌词设置
+lbl_font_size,字号
+btn_smaller,小一点
+btn_bigger,大一点
+lbl_color,当前句颜色
+lbl_position,位置
+btn_lock,锁定位置
+btn_unlock,解锁拖动
+btn_reset_pos,回到默认位置
+color_white,白
+color_yellow,黄
+color_cyan,青
+color_pink,粉
+color_green,绿
+lyric_loading,正在找歌词…
+lyric_instrumental,纯音乐，没有歌词
+lyric_instrumental_suffix,（纯音乐）
+lyric_no_track,没有在放网易云
+lyric_fail,歌词没拿到：{0}
+err_client_not_ready,客户端没准备好
+err_no_lyrics,拿不到歌词
+status_locked,位置已锁定
+status_unlocked,点歌词本身可以拖
+status_font,{0} 号
+status_selected,【{0}】
+item_tape_name,音乐磁带 - 网易云
+item_tape_desc,从网易云录下来的，塞进磁带机就能放。
+item_case_name,磁盘收纳盒
+item_case_desc,能塞 30 盘磁带，双击打开。
+tip_case_playing,正在播放第 {0} 盘
+err_client_missing,网易云客户端还没准备好
+err_play_flow,播放流程出错：{0}
+err_no_url,拿不到播放地址（可能要会员或版权受限）
+err_download,下载音频失败：{0}
+err_decode,音频解码失败：{0}
+err_decode_detail,格式不支持或下载中断
+err_no_source,找不到游戏的音乐音源
+err_silent,音频没有出声（可能是解码失败或格式不支持）

@@ -67,7 +67,7 @@ namespace NeteaseCassette
             }
             if (client == null)
             {
-                Fail("网易云客户端还没准备好");
+                Fail(Loc.T("err_client_missing"));
                 return;
             }
             Cancel();
@@ -155,7 +155,7 @@ namespace NeteaseCassette
                 catch (Exception e)
                 {
                     DisposeCurrent();
-                    Fail("播放流程出错：" + e.Message);
+                    Fail(Loc.T("err_play_flow", e.Message));
                     yield break;
                 }
                 if (!moved) yield break;
@@ -181,7 +181,7 @@ namespace NeteaseCassette
             if (gen != generation) yield break;
             if (string.IsNullOrEmpty(url))
             {
-                Fail(string.IsNullOrEmpty(urlError) ? "拿不到播放地址（可能要会员或版权受限）" : urlError);
+                Fail(string.IsNullOrEmpty(urlError) ? Loc.T("err_no_url") : urlError);
                 yield break;
             }
 
@@ -201,7 +201,7 @@ namespace NeteaseCassette
             catch (Exception e)
             {
                 if (req != null) req.Dispose();
-                Fail("下载音频失败：" + e.Message);
+                Fail(Loc.T("err_download", e.Message));
                 yield break;
             }
 
@@ -233,7 +233,7 @@ namespace NeteaseCassette
             if (clip == null)
             {
                 DisposeCurrent();
-                Fail("音频解码失败：" + (string.IsNullOrEmpty(error) ? "格式不支持或下载中断" : error));
+                Fail(Loc.T("err_decode", string.IsNullOrEmpty(error) ? Loc.T("err_decode_detail") : error));
                 yield break;
             }
 
@@ -262,7 +262,7 @@ namespace NeteaseCassette
             if (source == null)
             {
                 DisposeCurrent();
-                Fail("找不到游戏的音乐音源");
+                Fail(Loc.T("err_no_source"));
                 yield break;
             }
 
@@ -278,7 +278,7 @@ namespace NeteaseCassette
             if (!source.isPlaying)
             {
                 Cancel();
-                Fail("音频没有出声（可能是解码失败或格式不支持）");
+                Fail(Loc.T("err_silent"));
             }
         }
 

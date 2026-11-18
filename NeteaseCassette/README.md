@@ -76,15 +76,35 @@ NeteaseCassette/
 │   ├── CaseFrame.cs          收纳盒里那盘的播放框
 │   ├── CassetteScan.cs       往容器里递归找磁带
 │   ├── LootDump.cs           开发用：导出掉落表（已停用，接线在 ModEntry 里注释着）
+│   ├── Loc.cs                文案查表（Loc.T，读 Localization/*.csv）
 │   ├── QrCode.cs             QR 编码器（纯 C#）
 │   └── QrSprite.cs           QR 矩阵 → Texture2D / Sprite
+├── Localization/             en / zh / zh-Hans / zh-Hant 四份文案 CSV
 ├── Textures/Items/           64 张卡带图 + 3 个功能图标 + 3 个模式图标 + 收纳盒贴图
 └── tools/                    只用于开发验证，不参与编译、不会装进 Mods
     ├── QrProbe/              QR 矩阵打印 + 与 segno 对拍
     └── ApiProbe/             真实接口冒烟测试
 ```
 
+## 本地化
+
+界面文案和物品名都不再硬编码，全部走 `Localization/` 下的 CSV（键,文本，UTF-8，无表头）：
+
+```
+Localization/
+├── en.csv        英文
+├── zh.csv        中文（部分环境读这个码）
+├── zh-Hans.csv   简体中文
+└── zh-Hant.csv   繁体中文
+```
+
+- 游戏按当前语言找对应文件，找不到回退到 `en`，再找不到就显示键名（日志里会有一次警告）；
+- 加一门语言只需放一个 `<语言代码>.csv`，代码不用动；支持的语言代码见游戏文档（`en`、`fr`、`de`、`ru`、`zh`、`ja`、`es`、`ptBR`、`ko`、`it`、`pl`）；
+- 文本里用 `{0}`、`{1}` 占位符，代码里是 `Loc.T("key", 参数…)`；
+- 物品名在物品生成时解析，游戏中途切语言不会更新已经在背包里的物品。
+
 ## 编译
+
 
 根目录的 `Directory.Build.props` 里配游戏路径，然后：
 
@@ -130,6 +150,6 @@ dotnet build NeteaseCassette/NeteaseCassette.csproj -c Release
 - 只做 MP3（`encodeType=mp3`），没做无损 / FLAC。
 - 没做「每日推荐」「云盘」「评论」。
 - 歌单单次最多取 1000 首（接口上限），超出部分看不到。
-- 界面只有中文，没有做本地化。
+- 界面文本支持简中 / 繁中 / 英文，其余语言回退到英文；物品名和界面文案都走 `Localization/*.csv`。
 - 一首歌 3~5 MB，首次播放要下载 1~3 秒，缓冲期间是静音的（窗口里显示「正在播放」）。
-- 网易云接口是网页版那套，随时可能失效。
+- 网易云接口是网页版那套，随时可能失效；接口层返回的错误原文（少数状态行里的 `{0}`）仍是中文。
