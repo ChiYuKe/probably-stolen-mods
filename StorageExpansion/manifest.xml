@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>storage_expansion</ID>
+  <Name>储物扩容 / Storage Expansion</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.3</ModVersion>
+  <Description>给原版主仓库增加滚动条和预留格。点击格内的 + 解锁，也可 Ctrl 多选后批量解锁。解锁随存档保存。</Description>
+  <GameVersions><Version>0.46</Version></GameVersions>
+  <Prerequisites />
+  <Assemblies><Assembly>StorageExpansion.dll</Assembly></Assemblies>
+  <Capabilities />
+</Manifest>
