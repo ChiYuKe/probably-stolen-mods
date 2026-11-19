@@ -28,3 +28,6 @@ Sites/
 # Python 缓存
 __pycache__/
 *.pyc
+
+# 临时目录：编译测试、部署快照之类，随手生成随手删
+.scratch/
