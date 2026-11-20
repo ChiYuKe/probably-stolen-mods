@@ -17,6 +17,7 @@ namespace DayHud
 
         private AdvCalendarUIManager calendar;
         private ReputationUIManager reputation;
+        private bool featureEnabled = true;
         private Button tabButton;
         private TextMeshProUGUI tabLabel;
         private string tabText;
@@ -87,8 +88,33 @@ namespace DayHud
             }
         }
 
+        /// <summary>
+        /// 模组配置：是否在日历里显示“反馈”标签页。关掉时移除标签并还原反馈面板。
+        /// </summary>
+        public void SetEnabled(bool enabled)
+        {
+            featureEnabled = enabled;
+
+            if (!enabled)
+            {
+                AdvCalendarUIManager current = calendar;
+                ResetReferences();
+
+                // 如果关开关时正好停在“反馈”页，切回日历页，别留一个空页面
+                if (current != null && current.UIPanel != null && current.UIPanel.activeSelf)
+                {
+                    current.OnCalendarButtonClicked();
+                }
+            }
+        }
+
         private void Update()
         {
+            if (!featureEnabled)
+            {
+                return;
+            }
+
             if (calendar == null)
             {
                 if (attached || host != null || tabButton == null)

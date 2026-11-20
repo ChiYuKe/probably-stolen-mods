@@ -5,16 +5,7 @@ using UnityEngine;
 namespace DayHud
 {
     /// <summary>
-    /// 给其他 mod 用的轻量接口。游戏本身没有通知总线，只有 ModHook 的生命周期事件，
-    /// 所以跨 mod 推通知需要走这里。
-    ///
-    /// 其他 mod 不建议硬引用 DayHud.dll，用反射即可：
-    ///
-    /// var api = Type.GetType("DayHud.DayHudApi, DayHud");
-    /// var push = api?.GetMethod("Push", new[] { typeof(string), typeof(string), typeof(float) });
-    /// push?.Invoke(null, new object[] { "消息", "info", 7f });
-    ///
-    /// 没装 DayHud 时 Type.GetType 返回 null，反射调用自然不会发生，不会让别的 mod 报错。
+    /// 给其他模组用的通知接口。通过 ModHelper.Lookup 获取 DayHud 注册的服务。
     /// 如果 DayHud 已装但 HUD 还没建好，Push 会先排进队列，等 HUD 建好后补发。
     /// </summary>
     public static class DayHudApi
@@ -40,9 +31,38 @@ namespace DayHud
 
         private static readonly List<PendingNotice> pending = new List<PendingNotice>();
         private static DayHudPanel panel;
+        private static Func<(int Day, int MinuteOfDay, bool Waiting)> clockSource;
 
         /// <summary>接口版本，后续只增不改；其他 mod 可选检查。</summary>
-        public static int ApiVersion => 2;
+        public static int ApiVersion => 4;
+
+        public static void SetClockSource(Func<(int Day, int MinuteOfDay, bool Waiting)> source) => clockSource = source;
+
+        public static void ClearClockSource(Func<(int Day, int MinuteOfDay, bool Waiting)> source)
+        {
+            if (clockSource == source) clockSource = null;
+        }
+
+        internal static (int Day, int MinuteOfDay, bool Waiting) ReadClockDisplay()
+        {
+            var source = clockSource ?? ModHelper.Lookup<Func<(int Day, int MinuteOfDay, bool Waiting)>>("chemistry", "clock_display_v1");
+            var reading = source?.Invoke() ?? default;
+            return reading.Day > 0 && reading.MinuteOfDay >= 0 && reading.MinuteOfDay < 1440 ? reading : default;
+        }
+
+        public static bool TryGetGameTime(out int day, out int hour, out int minute)
+        {
+            var clock = ReadClockDisplay();
+            if (clock.Day > 0)
+            {
+                day = clock.Day;
+                hour = clock.MinuteOfDay / 60;
+                minute = clock.MinuteOfDay % 60;
+                return true;
+            }
+            day = hour = minute = 0;
+            return false;
+        }
 
         /// <summary>HUD 当前是否已经建好，可以立刻显示通知。</summary>
         public static bool IsAvailable => panel != null;

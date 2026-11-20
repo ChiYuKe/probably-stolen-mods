@@ -8,6 +8,9 @@ pay_tomorrow,明天還款
 status_open,營業中
 status_closed,已打烊
 status_morning,準備中
+clock_wait_open,待開店
+clock_wait_close,待打烊
+clock_wait_sleep,待休息
 credit_hover,你當前的信用點餘額
 config_hide_calendar,隱藏牆上的日曆便籤
 config_hide_calendar_tip,開啟後牆上的紙質日曆會收起來，天數和租金只在左上角表盤顯示。
@@ -35,3 +38,7 @@ calendar_tab_feedback,反饋
 calendar_feedback_title,陣營聲望
 config_hide_feedback|隱藏牆上的反饋箱
 config_hide_feedback_tip|開啟後牆上的反饋箱會收起來，陣營聲望改在日曆的「反饋」標籤頁查看。
+config_disable_door|關閉舊門的互動
+config_disable_door_tip|開啟後牆上那扇門不再回應懸停和點擊，只保留外觀，離店統一用左下角圖示。
+config_calendar_feedback|日曆顯示反饋標籤頁
+config_calendar_feedback_tip|開啟後進階日曆會多一個「反饋」標籤頁，顯示反饋箱的陣營聲望；關掉則移除這個標籤頁。

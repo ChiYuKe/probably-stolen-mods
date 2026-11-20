@@ -128,6 +128,7 @@ namespace DayHud
 
         private GameObject doorInteractionOwner;
         private bool doorInteractionDone;
+        private bool disableDoorInteraction = true;
         private readonly List<Collider2D> doorColliders = new List<Collider2D>();
         private readonly List<bool> doorColliderStates = new List<bool>();
         private readonly List<Behaviour> doorBehaviours = new List<Behaviour>();
@@ -169,6 +170,8 @@ namespace DayHud
         private bool feedbackHidden;
         private readonly List<HiddenObject> hiddenFeedbackObjects = new List<HiddenObject>();
         private bool hideOutsideStore = true;
+        private float nextOutsideHideAttempt;
+        private bool outsideHideLogged;
         private bool calendarSkin = true;
         private bool calendarTrimEdges = true;
         private bool calendarSpriteDirty;
@@ -185,6 +188,8 @@ namespace DayHud
         private bool rentMortgage;
         private bool statusDirty = true;
         private int shownStoreState = -1;
+        private int shownClockMinute = -1;
+        private bool shownClockBoundary;
         private Coroutine punchRoutine;
 
         public void Build(string modId, ModLog log)
@@ -247,7 +252,7 @@ namespace DayHud
         {
             hideWallCalendar = hide;
 
-            if (!hide && calendarHidden)
+            if (!hide && calendarHidden && !IsOutsideStore())
             {
                 calendarHidden = false;
                 RestorePhysicalCalendar();
@@ -266,7 +271,7 @@ namespace DayHud
         {
             hideCreditDisplay = hide;
 
-            if (!hide && creditHidden)
+            if (!hide && creditHidden && !IsOutsideStore())
             {
                 creditHidden = false;
                 RestoreCreditDisplay();
@@ -286,7 +291,7 @@ namespace DayHud
         {
             hideFeedbackBox = hide;
 
-            if (!hide && feedbackHidden)
+            if (!hide && feedbackHidden && !IsOutsideStore())
             {
                 feedbackHidden = false;
                 RestoreFeedbackBox();
@@ -844,6 +849,23 @@ namespace DayHud
         }
 
         /// <summary>
+        /// 模组配置：是否关掉墙上旧门的交互。默认关（只保留外观）。
+        /// </summary>
+        public void SetDoorInteractionDisabled(bool disabled)
+        {
+            disableDoorInteraction = disabled;
+
+            if (disabled)
+            {
+                DisableDoorInteraction();
+            }
+            else
+            {
+                RestoreDoorInteraction();
+            }
+        }
+
+        /// <summary>
         /// 旧的那扇门还留着外观，但不再响应鼠标：关掉碰撞体和交互/描边组件，
         /// 离店统一走左下角的 HUD 图标。
         /// </summary>
@@ -882,15 +904,16 @@ namespace DayHud
                     continue;
                 }
 
-                string typeName = behaviour.GetType().Name;
-                if (typeName != "Interactable" && typeName != "StoreDoor" && typeName != "Outlinable")
-                {
-                    continue;
-                }
-
+                // 门上可能还挂着别的 tooltip/trigger 脚本，全部停掉，只留 SpriteRenderer 外观
                 doorBehaviours.Add(behaviour);
                 doorBehaviourStates.Add(behaviour.enabled);
                 behaviour.enabled = false;
+            }
+
+            if (TooltipManager._instance != null)
+            {
+                // 清掉可能已经卡在门上的旧提示，避免两个“离开店铺”同时出现
+                TooltipManager._instance.HideTooltip();
             }
 
             doorInteractionDone = true;
@@ -2004,7 +2027,10 @@ namespace DayHud
             }
 
             RefreshCalendarSkin();
-            DisableDoorInteraction();
+            if (disableDoorInteraction)
+            {
+                DisableDoorInteraction();
+            }
 
             bool visible = !userHidden && ShouldShow();
             if (canvas.enabled != visible)
@@ -2030,6 +2056,16 @@ namespace DayHud
                 ClearNotifications();
                 noteFontTried = false;
 
+                // 离开店铺去 afterhour 场景（比如化学模组的地下实验室）时不能把墙上的日历/
+                // 信用点屏幕再放回去：游戏已经收起店铺 UI，这里 SetActive 会让它们盖在别的
+                // 场景背景上（用户 2026-11-19 截图：地下室里还看得到 DAY 1 / 507₡）。
+                // 另外它们可能在切场景的空档被别处重新激活过，这里要主动再收一次。
+                if (IsOutsideStore() && hideOutsideStore)
+                {
+                    HideWallDisplaysOutside();
+                    return;
+                }
+
                 if (calendarHidden)
                 {
                     calendarHidden = false;
@@ -2050,6 +2086,8 @@ namespace DayHud
 
                 return;
             }
+
+            outsideHideLogged = false;
 
             if (!noteFontTried)
             {
@@ -2152,6 +2190,76 @@ namespace DayHud
             shownDay = day;
             RefreshText(day);
             Punch();
+        }
+
+        /// <summary>
+        /// 在店铺外（淘荒/地下实验室这类 afterhour 场景）把墙上的日历、信用点屏幕、反馈箱
+        /// 强制收起来。切场景的空档里这些对象可能被别处重新激活，光"保持隐藏"不够，要再找一遍。
+        /// </summary>
+        private void HideWallDisplaysOutside()
+        {
+            bool search = Time.unscaledTime >= nextOutsideHideAttempt;
+            if (search)
+            {
+                nextOutsideHideAttempt = Time.unscaledTime + 2f;
+            }
+
+            PruneDeadObjects(hiddenCalendarObjects);
+            PruneDeadObjects(hiddenCreditObjects);
+            PruneDeadObjects(hiddenFeedbackObjects);
+
+            if (search && hiddenCalendarObjects.Count == 0)
+            {
+                HidePhysicalCalendar();
+            }
+
+            if (search && hiddenCreditObjects.Count == 0)
+            {
+                HideCreditDisplay();
+            }
+
+            if (search && hiddenFeedbackObjects.Count == 0)
+            {
+                HideFeedbackBox();
+            }
+
+            if (hiddenCalendarObjects.Count > 0)
+            {
+                calendarHidden = true;
+            }
+
+            if (hiddenCreditObjects.Count > 0)
+            {
+                creditHidden = true;
+            }
+
+            if (hiddenFeedbackObjects.Count > 0)
+            {
+                feedbackHidden = true;
+            }
+
+            KeepObjectsHidden(hiddenCalendarObjects);
+            KeepObjectsHidden(hiddenCreditObjects);
+            KeepObjectsHidden(hiddenFeedbackObjects);
+
+            if (!outsideHideLogged)
+            {
+                outsideHideLogged = true;
+                log.Log("离开店铺：墙上日历/信用点屏幕/反馈箱保持隐藏（" +
+                        hiddenCalendarObjects.Count + "/" + hiddenCreditObjects.Count + "/" +
+                        hiddenFeedbackObjects.Count + " 个对象）");
+            }
+        }
+
+        private static void PruneDeadObjects(List<HiddenObject> hidden)
+        {
+            for (int i = hidden.Count - 1; i >= 0; i--)
+            {
+                if (hidden[i].GameObject == null)
+                {
+                    hidden.RemoveAt(i);
+                }
+            }
         }
 
         private void OnDestroy()
@@ -2409,7 +2517,7 @@ namespace DayHud
             statusText.fontSize = statusSize;
             statusText.fontSizeMin = 8f;
             RectTransform statusRect = statusText.rectTransform;
-            statusRect.sizeDelta = new Vector2(width * 0.5f, height * 0.09f);
+            statusRect.sizeDelta = new Vector2(width * 0.73f, height * 0.09f);
             statusRect.anchoredPosition = new Vector2(0f, height * 0.295f);
 
             float daySize = Mathf.Clamp(width * 0.20f, 16f, 46f);
@@ -2533,13 +2641,18 @@ namespace DayHud
             }
 
             int state = (int)store.storeState;
-            if (!statusDirty && state == shownStoreState)
+            var clock = DayHudApi.ReadClockDisplay();
+            int minute = clock.Day > 0 ? clock.MinuteOfDay : -1;
+            bool boundary = clock.Day > 0 && clock.Waiting;
+            if (!statusDirty && state == shownStoreState && minute == shownClockMinute && boundary == shownClockBoundary)
             {
                 return;
             }
 
             statusDirty = false;
             shownStoreState = state;
+            shownClockMinute = minute;
+            shownClockBoundary = boundary;
 
             string key;
             Color color;
@@ -2558,6 +2671,11 @@ namespace DayHud
                 key = "status_closed";
                 color = new Color32(160, 148, 126, 220);
             }
+            if (boundary)
+            {
+                key = store.storeState == PlayerStore.StoreState.MORNING ? "clock_wait_open"
+                    : store.storeState == PlayerStore.StoreState.OPEN ? "clock_wait_close" : "clock_wait_sleep";
+            }
 
             string text = ModHelper.GetLocalized(modId, key);
             if (string.IsNullOrEmpty(text) || text == key)
@@ -2565,7 +2683,7 @@ namespace DayHud
                 text = DefaultStatus(store.storeState);
             }
 
-            statusText.text = text;
+            statusText.text = minute >= 0 ? FormattableString.Invariant($"{text} · {minute / 60:00}:{minute % 60:00}") : text;
             statusText.color = color;
             statusText.gameObject.SetActive(true);
         }
@@ -2814,8 +2932,11 @@ namespace DayHud
                 HideAllSceneObjects("CalendarGlow", hiddenCalendarObjects);
                 HideAllSceneObjects("rentTMP", hiddenCalendarObjects);
 
-                log.Log("墙上日历已隐藏 " + hiddenCalendarObjects.Count + " 个对象：" +
-                        NamesOf(hiddenCalendarObjects));
+                if (hiddenCalendarObjects.Count > 0)
+                {
+                    log.Log("墙上日历已隐藏 " + hiddenCalendarObjects.Count + " 个对象：" +
+                            NamesOf(hiddenCalendarObjects));
+                }
             }
             catch (Exception e)
             {

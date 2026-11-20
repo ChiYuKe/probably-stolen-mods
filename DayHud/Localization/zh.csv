@@ -8,6 +8,9 @@ pay_tomorrow,明天还款
 status_open,营业中
 status_closed,已打烊
 status_morning,准备中
+clock_wait_open,待开店
+clock_wait_close,待打烊
+clock_wait_sleep,待休息
 credit_hover,你当前的信用点余额
 config_hide_calendar,隐藏墙上的日历便签
 config_hide_calendar_tip,开启后墙上的纸质日历会收起来，天数和租金只在左上角表盘显示。
@@ -35,3 +38,7 @@ calendar_tab_feedback,反馈
 calendar_feedback_title,阵营声望
 config_hide_feedback|隐藏墙上的反馈箱
 config_hide_feedback_tip|开启后墙上的反馈箱会收起来，阵营声望改在日历的“反馈”标签页查看。
+config_disable_door|关闭旧门的交互
+config_disable_door_tip|开启后墙上那扇门不再响应悬停和点击，只保留外观，离店统一用左下角图标。
+config_calendar_feedback|日历显示反馈标签页
+config_calendar_feedback_tip|开启后高级日历会多一个“反馈”标签页，显示反馈箱的阵营声望；关掉则移除这个标签页。

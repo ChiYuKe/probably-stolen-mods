@@ -13,8 +13,11 @@ namespace DayHud
         private ConfigEntry<bool> hideCalendarEntry;
         private ConfigEntry<bool> hideCreditEntry;
         private ConfigEntry<bool> hideFeedbackEntry;
+        private ConfigEntry<bool> disableDoorEntry;
+        private ConfigEntry<bool> calendarFeedbackEntry;
         private ConfigEntry<bool> hideOutsideEntry;
         private GameObject calendarFeedbackObject;
+        private CalendarFeedbackTab calendarFeedbackTab;
         private ConfigEntry<bool> calendarSkinEntry;
         private ConfigEntry<bool> calendarTrimEntry;
         private GameObject hudObject;
@@ -50,6 +53,20 @@ namespace DayHud
                     () => ConfigText("config_hide_feedback", "隐藏墙上的反馈箱"),
                     () => ConfigText("config_hide_feedback_tip",
                         "开启后墙上的反馈箱会收起来，阵营声望改在日历的“反馈”标签页查看。"));
+                disableDoorEntry = config.Define(
+                    "disable_door_interaction",
+                    true,
+                    "HUD",
+                    () => ConfigText("config_disable_door", "关闭旧门的交互"),
+                    () => ConfigText("config_disable_door_tip",
+                        "开启后墙上那扇门不再响应悬停和点击，只保留外观，离店统一用左下角图标。"));
+                calendarFeedbackEntry = config.Define(
+                    "calendar_feedback_tab",
+                    true,
+                    "HUD",
+                    () => ConfigText("config_calendar_feedback", "日历显示反馈标签页"),
+                    () => ConfigText("config_calendar_feedback_tip",
+                        "开启后高级日历会多一个“反馈”标签页，显示反馈箱的阵营声望；关掉则移除这个标签页。"));
                 hideOutsideEntry = config.Define(
                     "hide_outside_store",
                     true,
@@ -83,11 +100,15 @@ namespace DayHud
             try
             {
                 EnsureHud();
+                ModHelper.Expose(manifest.ID, "notice_v1", (Func<string, string, float, bool>)DayHudApi.Push);
+                ModHelper.Expose(manifest.ID, "notice_focus_v1", (Func<string, string, float, GameItem, bool>)DayHudApi.PushFocus);
+                ModHelper.Expose(manifest.ID, "notice_action_v1", (Func<string, string, float, Action, bool>)DayHudApi.PushAction);
             }
             catch (Exception e)
             {
                 log.Error("建天数面板的时候崩了：" + e);
             }
+
 
             if (hideCalendarEntry != null)
             {
@@ -117,6 +138,21 @@ namespace DayHud
                 {
                     panel.SetHideFeedbackBox(hideFeedbackEntry.Value);
                 }
+            }
+
+            if (disableDoorEntry != null)
+            {
+                disableDoorEntry.OnChanged += OnDisableDoorChanged;
+
+                if (panel != null)
+                {
+                    panel.SetDoorInteractionDisabled(disableDoorEntry.Value);
+                }
+            }
+
+            if (calendarFeedbackEntry != null)
+            {
+                calendarFeedbackEntry.OnChanged += OnCalendarFeedbackChanged;
             }
 
             if (hideOutsideEntry != null)
@@ -170,7 +206,12 @@ namespace DayHud
 
                 calendarFeedbackObject = new GameObject("DayHudCalendarFeedback");
                 UnityEngine.Object.DontDestroyOnLoad(calendarFeedbackObject);
-                calendarFeedbackObject.AddComponent<CalendarFeedbackTab>().Init(manifest.ID, log);
+                calendarFeedbackTab = calendarFeedbackObject.AddComponent<CalendarFeedbackTab>();
+                calendarFeedbackTab.Init(manifest.ID, log);
+                if (calendarFeedbackEntry != null)
+                {
+                    calendarFeedbackTab.SetEnabled(calendarFeedbackEntry.Value);
+                }
             }
             catch (Exception e)
             {
@@ -181,11 +222,15 @@ namespace DayHud
         public void OnDisable()
         {
             DayHudApi.Detach(panel);
+            ModHelper.Expose(manifest.ID, "notice_v1", null);
+            ModHelper.Expose(manifest.ID, "notice_focus_v1", null);
+            ModHelper.Expose(manifest.ID, "notice_action_v1", null);
 
             if (calendarFeedbackObject != null)
             {
                 UnityEngine.Object.Destroy(calendarFeedbackObject);
                 calendarFeedbackObject = null;
+                calendarFeedbackTab = null;
             }
 
             if (hideCalendarEntry != null)
@@ -201,6 +246,16 @@ namespace DayHud
             if (hideFeedbackEntry != null)
             {
                 hideFeedbackEntry.OnChanged -= OnHideFeedbackChanged;
+            }
+
+            if (disableDoorEntry != null)
+            {
+                disableDoorEntry.OnChanged -= OnDisableDoorChanged;
+            }
+
+            if (calendarFeedbackEntry != null)
+            {
+                calendarFeedbackEntry.OnChanged -= OnCalendarFeedbackChanged;
             }
 
             if (hideOutsideEntry != null)
@@ -272,6 +327,11 @@ namespace DayHud
                 panel.SetHideFeedbackBox(hideFeedbackEntry.Value);
             }
 
+            if (disableDoorEntry != null)
+            {
+                panel.SetDoorInteractionDisabled(disableDoorEntry.Value);
+            }
+
             if (hideOutsideEntry != null)
             {
                 panel.SetHideOutsideStore(hideOutsideEntry.Value);
@@ -309,6 +369,22 @@ namespace DayHud
             if (panel != null)
             {
                 panel.SetHideFeedbackBox(value);
+            }
+        }
+
+        private void OnDisableDoorChanged(bool value)
+        {
+            if (panel != null)
+            {
+                panel.SetDoorInteractionDisabled(value);
+            }
+        }
+
+        private void OnCalendarFeedbackChanged(bool value)
+        {
+            if (calendarFeedbackTab != null)
+            {
+                calendarFeedbackTab.SetEnabled(value);
             }
         }
 

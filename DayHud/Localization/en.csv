@@ -8,6 +8,9 @@ pay_tomorrow,PAY TMRW
 status_open,OPEN
 status_closed,CLOSED
 status_morning,MORNING
+clock_wait_open,READY
+clock_wait_close,LAST CALL
+clock_wait_sleep,REST
 credit_hover,Your current credit count
 config_hide_calendar,Hide the wall calendar
 config_hide_calendar_tip,When enabled the paper calendar on the wall is hidden; the day and rent are shown on the HUD dial only.
@@ -35,3 +38,7 @@ calendar_tab_feedback,Feedback
 calendar_feedback_title,Faction Reputation
 config_hide_feedback|Hide the feedback box
 config_hide_feedback_tip|When enabled the wall feedback box is hidden; faction reputation is shown in the calendar's Feedback tab.
+config_disable_door|Disable the old door interaction
+config_disable_door_tip|When enabled the wall door no longer responds to hover or clicks; use the bottom-left icon to leave the store.
+config_calendar_feedback|Show the Feedback tab in the calendar
+config_calendar_feedback_tip|When enabled the advanced calendar gets a Feedback tab with faction reputation; disable it to remove the tab.
