@@ -203,7 +203,8 @@ namespace InventorySearch
                     Contraband = contraband
                 };
 
-                entry.Haystack = (name + "\n" + identifier + "\n" + entry.LocationText + "\n" + path).ToLowerInvariant();
+                string searchableName = name.Replace("<sub>", "").Replace("</sub>", "");
+                entry.Haystack = (searchableName + "\n" + identifier + "\n" + entry.LocationText + "\n" + path).ToLowerInvariant();
                 return entry;
             }
             catch (Exception e)
