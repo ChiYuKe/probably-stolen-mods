@@ -60,12 +60,13 @@ namespace Chemistry
 
                 foreach (var component in sample.Components)
                 {
-                    BuildComponentRow(builder, component, -1);
+                    BuildComponentRow(builder, sample, component, -1);
                 }
 
                 int impurities = 100 - SumPercent(sample);
                 LabUi.Label(builder,
-                    Loc.Get("sample_impurities_line", "杂质 {0}%", "Impurities {0}%", impurities),
+                    Loc.Get("sample_impurities_line", "杂质 {0}% · {1} g", "Impurities {0}% · {1} g",
+                        impurities, ChemUi.MassText(sample.Grams * impurities / 100.0)),
                     null, 12f, 520f, 22f, false, ChemUi.Dim, false, TextAlignmentOptions.Left);
 
                 LabUi.Label(builder,
@@ -109,7 +110,8 @@ namespace Chemistry
             builder.End();
         }
 
-        private static void BuildComponentRow(CustomUIBuilder builder, (string Symbol, int Percent) component, int rowIndex)
+        private static void BuildComponentRow(CustomUIBuilder builder, SampleDef sample,
+            (string Symbol, int Percent) component, int rowIndex)
         {
             ElementDef element = ChemistryCatalog.FindElement(component.Symbol);
             builder.BeginRow(8f, TextAnchor.MiddleLeft);
@@ -127,7 +129,9 @@ namespace Chemistry
             LabUi.Label(builder, name + "（" + component.Symbol + "）", null, 13f, 300f, 26f,
                 false, ChemUi.Main, true, TextAlignmentOptions.MidlineLeft);
             builder.AddFlexibleSpace();
-            LabUi.Label(builder, component.Percent + "%", null, 14f, 80f, 26f,
+            LabUi.Label(builder,
+                component.Percent + "% · " + ChemUi.MassText(sample.ComponentGrams(component.Symbol)) + " g",
+                null, 14f, 150f, 26f,
                 false, ChemUi.Accent, true, TextAlignmentOptions.Right);
             builder.End();
         }
@@ -235,7 +239,8 @@ namespace Chemistry
 
             string name = element != null ? Loc.Pick(element.NameZh, element.NameEn) : component.Symbol;
             LabUi.Label(builder,
-                name + "（" + component.Symbol + "） " + component.Percent + "%\n" +
+                name + "（" + component.Symbol + "） " + component.Percent + "% · " +
+                ChemUi.MassText(sample.ComponentGrams(component.Symbol)) + " g\n" +
                 Loc.Get("sample_refine_cost", "耗样品 {0} 份 · 现有 {1} 份", "Cost {0} · have {1}", need, available),
                 null, 12f, 380f, 42f, true, enough ? ChemUi.Main : ChemUi.Dim, false, TextAlignmentOptions.MidlineLeft);
             builder.AddFlexibleSpace();

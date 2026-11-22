@@ -101,8 +101,8 @@ namespace Chemistry
             if (builder == null) return;
             reactionBook = builder.Handle;
             builder.SetSize(600f, 460f).SetDraggable(true).SetCloseOnEscape(true).Center();
-            LabUi.Label(builder, Loc.Pick("先用烧杯或搅拌器配制水溶液。可继续加料，也可把两份溶液倒在一起。",
-                "Prepare solutions with the beaker or stirrer. Add more reagent or pour two solutions together."),
+            LabUi.Label(builder, Loc.Pick("先用烧杯或搅拌器配制水溶液。可继续加料（任意固体或液体试剂，容量装得下即可），也可把两份溶液倒在一起。",
+                "Prepare solutions with the beaker or stirrer. Add any solid or liquid reagent while the beaker has room, or pour two solutions together."),
                 null, 12f, 560f, 34f, true, ChemUi.Main, false, TextAlignmentOptions.TopLeft);
             builder.BeginScrollFlexible(260f);
             foreach (AqueousReactions.Equation equation in AqueousReactions.Equations)

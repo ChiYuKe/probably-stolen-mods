@@ -178,6 +178,8 @@ namespace Chemistry
             {
                 foreach (GameItem item in inventory.childItems.ToArray())
                 {
+                    // 读档时物品或其 contentWindow 可能已被场景销毁（假 null），Destroy 会炸。
+                    if (item == null || (item.contentWindow != null && item.contentWindow.handler == null)) continue;
                     item.Destroy();
                 }
             }

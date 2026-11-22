@@ -10,7 +10,8 @@ namespace Chemistry
     /// <summary>
     /// 地下实验室面板：顶部摘要与实验台、检测提炼、储物格、档案四页。
     ///
-    /// MapUIManager 创建场景入口时调用 BuildLauncher，并补上「返回当铺」按钮。
+    /// MapUIManager 创建场景入口时调用 BuildLauncher（游戏随后会自动补一个「返回」按钮，
+    /// LabPanelAnchor 把它摘掉：实验室里点铁门就能返店，面板上那个按钮是多余的）。
     /// 实验台操作面板从入口打开，让场景里的原版储物槽先显示。
     /// 数据全部来自 LabStorage / LabSynthesis / StoryService / ChemistryCatalog，界面只负责显示。
     ///
@@ -66,6 +67,8 @@ namespace Chemistry
                 LabPanelAnchor anchor = builder.Handle.root.AddComponent<LabPanelAnchor>();
                 anchor.Size = new Vector2(220f, 118f);
                 anchor.Anchor = new Vector2(0.86f, 0.44f);
+                anchor.Window = builder.Handle;
+                anchor.RemoveAfterhourReturnButton = true;
             }
             builder.AddButton(Loc.Get("lab_open_tools", "打开实验台", "Open lab bench"), OpenTools);
         }
@@ -900,8 +903,9 @@ namespace Chemistry
             LabUi.Label(builder, "×" + count, null, 11f, StorageCellWidth - 8f, 16f, false,
                 ChemUi.Main, true, TextAlignmentOptions.Center);
             SampleDef sample = SampleTable.Find(itemId);
+            string mass = sample != null ? sample.MassLine() + "\n" : "";
             string report = sample != null && itemId == sample.DetectedId ? sample.Report() + "\n" : "";
-            builder.WithTooltip((info != null ? info.Name : itemId) + " ×" + count + "\n" + report
+            builder.WithTooltip((info != null ? info.Name : itemId) + " ×" + count + "\n" + mass + report
                 + Loc.Get("lab_slot_withdraw_hint", "点击取出 1 件到店里", "Click to take 1 back to the store"));
 
             builder.End();

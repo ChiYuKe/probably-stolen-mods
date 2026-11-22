@@ -77,7 +77,7 @@ namespace Chemistry
                 return;
             }
             window = builder.Handle;
-            builder.SetSize(632f, 566f).SetDraggable(true).SetCloseOnEscape(true).Center().OnClose(() =>
+            builder.SetSize(632f, 624f).SetDraggable(true).SetCloseOnEscape(true).Center().OnClose(() =>
             {
                 window = null;
                 pending = PendingAction.None;
@@ -95,35 +95,39 @@ namespace Chemistry
             builder.AddSpace(6f);
 
             builder.BeginRow(9f, TextAnchor.UpperLeft);
-            Section(builder, "工序测试", "Process tests");
+            Section(builder, "工序测试", "Process tests", 6);
             Button(builder, "样品检测测试包", "Sample analysis kit", DebugKit.GiveSampleKit);
             Button(builder, "制酸测试包", "Acid synthesis kit", DebugKit.GiveAcidCraftKit);
             Button(builder, "酸浸测试包", "Leaching kit", DebugKit.GiveLeachingKit);
             Button(builder, "过滤测试包", "Filtering kit", DebugKit.GiveFilteringKit);
             Button(builder, "还原测试包", "Reduction kit", DebugKit.GiveReductionKit);
+            Button(builder, "水溶液反应测试包", "Aqueous reactions kit", DebugKit.GiveAqueousKit);
             builder.End();
 
-            Section(builder, "试剂与容器", "Reagents & containers");
+            Section(builder, "试剂与容器", "Reagents & containers", 6);
             Button(builder, "满瓶酸测试包", "Full acid bottles kit", DebugKit.GiveFullAcidKit);
             Button(builder, "全容器测试包", "All containers kit", DebugKit.GiveBottleFillKit);
             Button(builder, "大容器测试包", "Bulk containers kit", DebugKit.GiveBulkContainerKit);
             Button(builder, "破损容器样品", "Damaged containers", DebugKit.GiveDamagedBottleKit);
+            Button(builder, "气体处理测试包", "Gas handling kit", DebugKit.GiveGasKit);
+            Button(builder, "废物处理测试包", "Waste disposal kit", DebugKit.GiveWasteKit);
             builder.End();
 
-            Section(builder, "补给", "Supplies");
+            Section(builder, "补给", "Supplies", 6);
             Button(builder, "开局补给", "Starter kit", DebugKit.GiveStarterKit);
             Button(builder, "常用元素 ×1", "Common elements ×1", () => DebugKit.GiveCommonElements(1));
             Button(builder, "全部元素 ×1", "All elements ×1", () => DebugKit.GiveAllElements(1));
             Button(builder, "全部工具", "All tools", DebugKit.GiveAllTools);
             Button(builder, "全部化合物", "All compounds", DebugKit.GiveAllCompounds);
+            Button(builder, "合成材料测试包", "Synthesis materials kit", DebugKit.GiveSynthesisKit);
             builder.End();
             builder.End();
             builder.AddSpace(6f);
 
             builder.BeginRow(10f, TextAnchor.MiddleLeft);
-            Button(builder, "前期设备测试包", "Early equipment kit", () => DebugKit.GiveEquipmentKit(1));
-            Button(builder, "中期设备测试包", "Midgame equipment kit", () => DebugKit.GiveEquipmentKit(2));
-            Button(builder, "后期设备测试包", "Late equipment kit", () => DebugKit.GiveEquipmentKit(3));
+            Button(builder, "设备测试包 1", "Equipment kit 1", () => DebugKit.GiveEquipmentKit(1));
+            Button(builder, "设备测试包 2", "Equipment kit 2", () => DebugKit.GiveEquipmentKit(2));
+            Button(builder, "设备测试包 3", "Equipment kit 3", () => DebugKit.GiveEquipmentKit(3));
             builder.End();
             builder.BeginRow(10f, TextAnchor.MiddleLeft);
             Button(builder, "分层沉淀测试包", "Mixture separation kit", DebugKit.GiveMixtureKit);
@@ -133,6 +137,10 @@ namespace Chemistry
             builder.BeginRow(10f, TextAnchor.MiddleLeft);
             Button(builder, "进阶实验测试包", "Advanced experiments kit", DebugKit.GiveProcessKit);
             Button(builder, "自动化厂房测试包", "Automated workshop kit", DebugKit.GiveFactoryKit);
+            builder.End();
+            builder.BeginRow(10f, TextAnchor.MiddleLeft);
+            Button(builder, "常用元素 ×10", "Common elements ×10", () => DebugKit.GiveCommonElements(10));
+            Button(builder, "全部元素 ×10", "All elements ×10", () => DebugKit.GiveAllElements(10));
             builder.End();
             builder.AddSpace(6f);
 
@@ -150,14 +158,16 @@ namespace Chemistry
             builder.Last.SetPreferredSize(ButtonWidth, 26f);
             builder.End();
 
-            builder.AddLabel(Loc.Pick("测试包优先送到已打开的实验室储物格，否则送往当铺库存。", "Kits go to the open lab storage or, if closed, to store inventory."), StatusId);
+            builder.AddLabel(Loc.Pick("测试包送到当前打开的仓库页（实验/自定义仓库），窗口没开就送往当铺库存。", "Kits go to the currently open warehouse page (lab/custom) or, if closed, to store inventory."), StatusId);
             ChemUi.Style(builder.Last, 13f, 580f, 42f, false, ChemUi.Dim, true, TextAlignmentOptions.Left);
             builder.Show();
         }
 
-        private static void Section(CustomUIBuilder builder, string zh, string en)
+        private static void Section(CustomUIBuilder builder, string zh, string en, int buttons)
         {
-            builder.BeginPanel(194f, 184f, TextAnchor.UpperLeft, 8f, 4f);
+            // 184 是原来 5 个按钮的面板高度，每多一个按钮加一格。
+            float height = 184f + 26f * Math.Max(0, buttons - 5);
+            builder.BeginPanel(194f, height, TextAnchor.UpperLeft, 8f, 4f);
             builder.AddLabel(Loc.Pick(zh, en));
             ChemUi.Style(builder.Last, 14f, ButtonWidth, 22f, true, ChemUi.Accent, false, TextAlignmentOptions.Left);
         }
@@ -181,8 +191,8 @@ namespace Chemistry
             : Loc.Pick("清空模组数据", "Reset mod data");
 
         private static string ClearStorageLabel() => pending == PendingAction.ClearLabStorage
-            ? Loc.Pick("确认清空地下室仓库", "Confirm clear storage")
-            : Loc.Pick("清空地下室仓库", "Clear lab storage");
+            ? Loc.Pick("确认清空当前仓库页", "Confirm clear current page")
+            : Loc.Pick("清空当前仓库页", "Clear current page");
 
         private static void SetPending(PendingAction action)
         {

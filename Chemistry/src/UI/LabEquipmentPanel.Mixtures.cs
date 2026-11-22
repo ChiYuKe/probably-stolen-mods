@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Chemistry
@@ -46,11 +47,32 @@ namespace Chemistry
                 || id == ChemistryCatalog.ToolItemId("conical_flask");
         }
 
-        private static bool IsMixIngredient(GameItem item) =>
+        private static bool IsMixIngredient(GameItem item) => item != null && (
             item.identifier == LabMixtureData.Chalk || item.identifier == LabMixtureData.Salt
             || AqueousReactions.IsSolidReagent(item.identifier)
             || (item.identifier == LabProcessData.CarbonDioxide && MaterialItemArt.IsSmallGasVial(item.spritePath))
-            || (IsMixLiquid(item.identifier) && ReagentBottle.SizeOf(item) != ReagentBottle.Bulk);
+            || (IsMixLiquid(item.identifier) && ReagentBottle.SizeOf(item) != ReagentBottle.Bulk)
+            || (AqueousReactions.IsCompound(item.identifier) && ReagentBottle.SizeOf(item) != ReagentBottle.Bulk
+                && !ReagentBottle.IsGas(item.identifier)));
+
+        /// <summary>可溶解或反应的固体：粉末、金属钠或其他化合物固体；白垩/盐在水样里保留悬浊液/盐液配方。</summary>
+        private bool IsDissolvableSolid(GameItem item) => item != null
+            && !ReagentBottle.IsLiquid(item.identifier) && !ReagentBottle.IsGas(item.identifier)
+            && (AqueousReactions.IsSolidReagent(item.identifier)
+                || (AqueousReactions.IsCompound(item.identifier)
+                    && !(Input?.identifier == LabMixtureData.Water
+                        && (item.identifier == LabMixtureData.Chalk || item.identifier == LabMixtureData.Salt))));
+
+        /// <summary>可并入样品的化合物液体小瓶；水样+50 mL 的油/乙醇/染料/示踪液配方优先走原路线。</summary>
+        private bool IsMergeableLiquid(GameItem item) => item != null && item.unitCount > 0
+            && ReagentBottle.IsLiquid(item.identifier) && ReagentBottle.SizeOf(item) != ReagentBottle.Bulk
+            && AqueousReactions.IsCompound(item.identifier)
+            && !(Input?.identifier == LabMixtureData.Water && item.identifier == LabDistillationData.Ethanol
+                && item.unitCount == LabMixtureData.Portion);
+
+        /// <summary>本次能倒进样品瓶的 units，受样品瓶容量限制。</summary>
+        private static int PourableUnits(GameItem sample, GameItem reagent) => sample == null || reagent == null ? 0
+            : Math.Min(reagent.unitCount, Math.Max(0, ReagentBottle.CapacityFor(sample) - sample.unitCount));
 
         private static bool IsMixLiquid(string id) => id == LabMixtureData.Oil || id == LabDistillationData.Ethanol
             || id == LabAnalysisData.Dye || id == LabProcessData.OilTrace;
@@ -85,23 +107,37 @@ namespace Chemistry
         {
             if (Task == EquipmentTask.Mix)
             {
-                if (AqueousReactions.IsSolidReagent(Receiver?.identifier))
+                if (Receiver != null)
                 {
-                    if (!AqueousReactions.CanPrepare(Input))
-                        return Loc.Pick("先装入水、乙酸或水溶液", "Load water, acetic acid or an aqueous solution first");
-                    if (AqueousReactions.IsSodium(Receiver.identifier) && !AqueousReactions.HasWater(Input))
-                        return Loc.Pick("这个样品里需要有水", "This sample must contain water");
-                    return null;
+                    if (IsDissolvableSolid(Receiver))
+                    {
+                        if (!AqueousReactions.CanPrepare(Input))
+                            return Loc.Pick("先装入水、乙酸或水溶液", "Load water, acetic acid or an aqueous solution first");
+                        if (AqueousReactions.IsSodium(Receiver.identifier) && !AqueousReactions.HasWater(Input))
+                            return Loc.Pick("这个样品里需要有水", "This sample must contain water");
+                        return null;
+                    }
+                    if (IsMergeableLiquid(Receiver))
+                    {
+                        if (!AqueousReactions.CanPrepare(Input))
+                            return Loc.Pick("摇匀样品前请清空加料槽", "Clear the ingredient slot before remixing");
+                        if (PourableUnits(Input, Receiver) <= 0)
+                            return Loc.Pick("烧杯容量已满", "The beaker is full");
+                        return null;
+                    }
                 }
                 if (Input.identifier == LabAnalysisData.Dye) return null;
                 if (AqueousReactions.CanPrepare(Input) && Input.identifier != Water)
-                    return Loc.Pick("装入支持的固体试剂", "Load a supported solid reagent");
+                    return Receiver == null
+                        ? Loc.Pick("装入固体或液体试剂", "Load a solid or liquid reagent")
+                        : Loc.Pick("这瓶试剂需要水样才能配方混合", "This reagent needs a water sample to mix");
                 if (Input.identifier != Water)
                     return Receiver == null ? null : Loc.Pick("摇匀样品前请清空加料槽", "Clear the ingredient slot before remixing");
                 if (Input.unitCount != LabMixtureData.Portion || ReagentBottle.SizeOf(Input) != LabMixtureData.SmallBottle)
                     return Loc.Pick("小号水瓶需装 50 mL", "The small water bottle must hold 50 mL");
                 if (Receiver == null || !IsMixIngredient(Receiver))
-                    return Loc.Pick("装入第二原料：油、乙醇、示踪液或固体试剂", "Load a second ingredient such as oil, ethanol, tracer or a solid reagent");
+                    return Loc.Pick("装入第二原料：油、乙醇、示踪液或任意固体/液体试剂",
+                        "Load a second ingredient — oil, ethanol, tracer or any solid/liquid reagent");
                 if (IsMixLiquid(Receiver.identifier) && Receiver.unitCount != LabMixtureData.Portion)
                     return Loc.Pick("第二瓶液体需装 50 mL", "The second bottle must hold 50 mL");
             }
@@ -128,7 +164,8 @@ namespace Chemistry
             switch (Task)
             {
                 case EquipmentTask.Mix:
-                    if (AqueousReactions.IsSolidReagent(Receiver?.identifier)) return PrepareAqueousSample(grid, input);
+                    if (IsDissolvableSolid(Receiver)) return PrepareAqueousSample(grid, input);
+                    if (IsMergeableLiquid(Receiver)) return MergeLiquidReagent(grid, input);
                     if (id == LabMixtureData.Layers) return Commit(grid, input, LabMixtureData.Emulsion);
                     if (id == LabMixtureData.Settled) return Commit(grid, input, LabMixtureData.Suspension);
                     return Mix(grid, input, Receiver);

@@ -24,6 +24,31 @@ namespace Chemistry
             return AqueousReactions.Describe(result.Effects);
         }
 
+        private string MergeLiquidReagent(LabInventoryGrid grid, GameItem sample)
+        {
+            GameItem reagent = Receiver;
+            int poured = PourableUnits(sample, reagent);
+            if (poured <= 0) return Loc.Pick("烧杯容量已满", "The beaker is full");
+            var result = AqueousReactions.Plan(sample, sample.unitCount, reagent, poured);
+            string composition = AqueousReactions.Encode(
+                LiquidComposition.Combine(sample, sample.unitCount, reagent, poured), result.Amounts);
+            var product = new MachineBatch.Product(
+                sample.identifier == LabMixtureData.UnknownPlastic ? LabMixtureData.UnknownPlastic : LabMixtureData.Unknown,
+                output, sample.unitCount + poured, ReagentBottle.SizeOf(sample), composition);
+            var inputs = new List<(GameItem, int)> { (sample, sample.unitCount), (reagent, poured) };
+            bool emptied = poured == reagent.unitCount;
+            bool complete = emptied
+                ? MachineBatch.TryCommitMeasured(grid, inputs, product,
+                    new MachineBatch.Product(ReagentBottle.ReturnedEmpty(reagent), byproduct))
+                : MachineBatch.TryCommitMeasured(grid, inputs, product);
+            if (!complete) return Failed;
+            string message = result.Ticks == 0
+                ? Loc.Pick("已并入液体试剂，可以继续加料。", "Reagent merged. You can add another reagent.")
+                : AqueousReactions.Describe(result.Effects);
+            if (result.Ticks > 0) LiquidMotion.BeginReaction(output.childItem);
+            return emptied ? message : message + Loc.Pick("（试剂瓶还有剩余）", " (reagent bottle not empty)");
+        }
+
         private static MachineBatch.Product AqueousOutput(GameItem input, Dictionary<string, decimal> contents, GameInventory destination) =>
             new(input.identifier == LabMixtureData.UnknownPlastic ? LabMixtureData.UnknownPlastic : LabMixtureData.Unknown,
                 destination, input.unitCount, ReagentBottle.SizeOf(input), AqueousReactions.Encode(

@@ -415,6 +415,7 @@ namespace Chemistry
         {
             var supplies = LabEquipmentData.All.Where(def => def.Tier == tier)
                 .ToDictionary(def => ChemistryCatalog.ToolItemId(def.Key), _ => 1);
+            supplies.Add("energy_credit", 1);
             string water = ChemistryCatalog.CompoundItemId("water");
             supplies.Add(water, ReagentBottle.CapacityFor(water));
             supplies.Add(ReagentBottle.EmptyId, 3);
@@ -431,10 +432,7 @@ namespace Chemistry
             {
                 supplies.Add(SampleTable.All.First(sample => sample.Batch == "13").ItemId, 2);
             }
-            if (GiveTestSupplies(supplies))
-            {
-                LabEquipmentPanel.EnableTestTier(tier);
-            }
+            GiveTestSupplies(supplies);
         }
 
         internal static void GiveMixtureKit()
@@ -449,13 +447,106 @@ namespace Chemistry
                 supplies.Add((LabMixtureData.Water, LabMixtureData.Portion, LabMixtureData.SmallBottle));
             }
             supplies.Add((LabMixtureData.Oil, LabMixtureData.Portion, LabMixtureData.SmallBottle));
+            supplies.Add((AqueousReactions.ItemId(AqueousReactions.Acetic), LabMixtureData.Portion, LabMixtureData.SmallBottle));
+            supplies.Add((AqueousReactions.ItemId("sodium_carbonate"), 1, -1));
             supplies.Add((LabMixtureData.Chalk, 1, -1));
             supplies.Add((LabMixtureData.Salt, 1, -1));
             supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 2, -1));
-            if (GiveTestSupplies(supplies))
+            GiveTestSupplies(supplies);
+        }
+
+        /// <summary>
+        /// 水溶液反应测试包：钠、乙酸和全套粉剂，覆盖烧杯加料的全部反应方程
+        /// （钠遇水放氢、酸碱中和、酸+碳酸盐放二氧化碳、钙盐沉淀），配套集气和过滤工具。
+        /// </summary>
+        internal static void GiveAqueousKit()
+        {
+            var supplies = new List<(string Id, int Units, int Size)>();
+            foreach (string key in new[] { "beaker", "conical_flask", "filter_funnel", "fume_hood", "ph_meter" })
             {
-                LabEquipmentPanel.EnableTestTier(2);
+                supplies.Add((ChemistryCatalog.ToolItemId(key), 1, -1));
             }
+            for (int i = 0; i < 3; i++)
+            {
+                supplies.Add((LabMixtureData.Water, LabMixtureData.Portion, LabMixtureData.SmallBottle));
+            }
+            string acetic = AqueousReactions.ItemId(AqueousReactions.Acetic);
+            supplies.Add((acetic, ReagentBottle.CapacityFor(acetic), -1));
+            supplies.Add((ChemistryCatalog.ElementItemId("Na"), 2, -1));
+            foreach (string key in new[] { "sodium_bicarbonate", "potassium_bicarbonate", "sodium_carbonate", "potassium_carbonate",
+                "calcium_chloride", "sodium_hydroxide", "potassium_hydroxide", "calcium_hydroxide" })
+            {
+                supplies.Add((ChemistryCatalog.CompoundItemId(key), 1, -1));
+            }
+            supplies.Add((LabMixtureData.Chalk, 1, -1));
+            supplies.Add((ReagentBottle.GasEmpties[LabMixtureData.SmallBottle], 2, -1));
+            supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 2, -1));
+            GiveTestSupplies(supplies);
+        }
+
+        /// <summary>气体处理测试包：全套采样气瓶 + 钢瓶，二氧化碳/氢气满瓶，含气水样测通风橱集气。</summary>
+        internal static void GiveGasKit()
+        {
+            var supplies = new List<(string Id, int Units, int Size)>();
+            foreach (string id in ReagentBottle.GasEmpties)
+            {
+                supplies.Add((id, 1, -1));
+            }
+            supplies.Add((BulkContainers.SteelId, 1, -1));
+            string co2 = ChemistryCatalog.CompoundItemId(AqueousReactions.CarbonDioxide);
+            AddFullBottleSamples(supplies, co2);
+            supplies.Add((co2, ReagentBottle.CapacityFor(co2, ReagentBottle.Bulk), ReagentBottle.Bulk));
+            string hydrogen = ChemistryCatalog.ElementItemId("H");
+            supplies.Add((hydrogen, ReagentBottle.CapacityFor(hydrogen), ReagentBottle.Medium));
+            supplies.Add((LabProcessData.MineralWater, 2, -1));
+            foreach (string key in new[] { "fume_hood", "chromatograph" })
+            {
+                supplies.Add((ChemistryCatalog.ToolItemId(key), 1, -1));
+            }
+            GiveTestSupplies(supplies);
+        }
+
+        /// <summary>废物处理测试包：废液桶 + 废物桶 + 可投弃的废料（破损容器、废炭、废样品、清洗废液）。</summary>
+        internal static void GiveWasteKit()
+        {
+            var supplies = new List<(string Id, int Units, int Size)>
+            {
+                (BulkContainers.EmptyLiquidWasteId, 1, -1),
+                (BulkContainers.EmptySolidWasteId, 1, -1),
+                (ReagentBottle.DamagedIds[0], 1, -1),
+                (ReagentBottle.DamagedIds[1], 1, -1),
+                (ReagentBottle.DamagedIds[2], 1, -1),
+                (LabProcessData.Rinse, 2, -1),
+                (LabAnalysisData.Spent, 1, -1),
+                (SampleTable.VanillaScrapId, 1, -1),
+                (SampleTable.All[0].ItemId, 1, -1),
+                (SampleTable.All[3].ItemId, 1, -1),
+                (SampleTable.All[5].ItemId, 1, -1),
+            };
+            string water = ChemistryCatalog.CompoundItemId("water");
+            supplies.Add((water, ReagentBottle.CapacityFor(water), -1));
+            supplies.Add((LabMixtureData.Water, LabMixtureData.Portion, LabMixtureData.SmallBottle));
+            GiveTestSupplies(supplies);
+        }
+
+        /// <summary>
+        /// 合成材料测试包：按剧情链路的用量发常用元素（够做水、酸、有机物和 TNT 等危险品），
+        /// 配上危险品配方要的工具，测档案 ch2~ch5 的解锁节奏。
+        /// </summary>
+        internal static void GiveSynthesisKit()
+        {
+            var symbols = new[] { "H", "C", "N", "O", "Na", "S", "Cl", "K", "Ca", "Fe", "Cu", "Zn", "Mg", "Al", "Si", "P" };
+            var units = new[] { 32, 32, 32, 32, 16, 16, 8, 8, 8, 8, 8, 8, 4, 4, 4, 4 };
+            var supplies = new Dictionary<string, int>();
+            for (int i = 0; i < symbols.Length; i++)
+            {
+                supplies.Add(ChemistryCatalog.ElementItemId(symbols[i]), units[i]);
+            }
+            foreach (string key in new[] { "beaker", "conical_flask", "round_flask", "distiller", "fume_hood" })
+            {
+                supplies.Add(ChemistryCatalog.ToolItemId(key), 1);
+            }
+            GiveTestSupplies(supplies);
         }
 
         internal static void GiveDistillationKit()
@@ -470,10 +561,7 @@ namespace Chemistry
             supplies.Add((LabMixtureData.Water, LabMixtureData.Portion, LabMixtureData.SmallBottle));
             supplies.Add((LabDistillationData.Ethanol, LabMixtureData.Portion, LabMixtureData.SmallBottle));
             supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 5, -1));
-            if (GiveTestSupplies(supplies))
-            {
-                LabEquipmentPanel.EnableTestTier(3);
-            }
+            GiveTestSupplies(supplies);
         }
 
         internal static void GiveAnalysisKit()
@@ -491,10 +579,7 @@ namespace Chemistry
             supplies.Add((LabAnalysisData.Dye, 2, LabMixtureData.SmallBottle));
             supplies.Add((LabAnalysisData.Titrant, 6, ReagentBottle.Medium));
             supplies.Add((LabAnalysisData.Carbon, 2, -1));
-            if (GiveTestSupplies(supplies))
-            {
-                LabEquipmentPanel.EnableTestTier(3);
-            }
+            GiveTestSupplies(supplies);
         }
 
         internal static void GiveFactoryKit()
@@ -512,7 +597,7 @@ namespace Chemistry
                 { NitricProductionData.Parts, 3 },
                 { ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 10 }
             };
-            if (GiveTestSupplies(supplies)) LabEquipmentPanel.EnableTestTier(3);
+            GiveTestSupplies(supplies);
         }
 
         internal static void GiveProcessKit()
@@ -538,10 +623,7 @@ namespace Chemistry
             supplies.Add((LabMixtureData.Chalk, 1, -1));
             supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 7, -1));
             supplies.Add((ReagentBottle.GasEmpties[LabMixtureData.SmallBottle], 2, -1));
-            if (GiveTestSupplies(supplies))
-            {
-                LabEquipmentPanel.EnableTestTier(3);
-            }
+            GiveTestSupplies(supplies);
         }
 
         public static void GiveReductionKit()
@@ -714,17 +796,17 @@ namespace Chemistry
                 if (grid.TryClearStorage(out int removedStacks))
                 {
                     ChemistryDebugWindow.Report(removedStacks == 0
-                        ? Loc.Pick("地下室仓库已经是空的。", "Lab storage is already empty.")
-                        : string.Format(Loc.Pick("地下室仓库已清空，移除 {0} 组物品。", "Lab storage cleared. Removed {0} item stacks."), removedStacks), true);
+                        ? Loc.Pick("当前仓库页已经是空的。", "The current page is already empty.")
+                        : string.Format(Loc.Pick("当前仓库页已清空，移除 {0} 组物品。", "Current page cleared. Removed {0} item stacks."), removedStacks), true);
                     return;
                 }
             }
             catch (Exception error)
             {
-                ChemistryMod.Log?.Warning("清空地下室仓库失败：" + error);
+                ChemistryMod.Log?.Warning("清空当前仓库页失败：" + error);
             }
 
-            ChemistryDebugWindow.Report(Loc.Pick("无法清空地下室仓库，请查看日志。", "Could not clear lab storage. Check the log."), false);
+            ChemistryDebugWindow.Report(Loc.Pick("无法清空当前仓库页，请查看日志。", "Could not clear the current page. Check the log."), false);
         }
 
         /// <summary>清掉本模组写在存档里的数据（开局补给标记等），方便重测。</summary>

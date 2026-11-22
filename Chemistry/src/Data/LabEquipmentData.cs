@@ -19,9 +19,10 @@ namespace Chemistry
         internal readonly string ActionEn;
         internal readonly string SettingZh;
         internal readonly string SettingEn;
+        internal readonly int PowerKj;
 
         internal LabEquipmentDef(string key, int tier, EquipmentTask task, string actionZh,
-            string actionEn, string settingZh = null, string settingEn = null)
+            string actionEn, string settingZh = null, string settingEn = null, int powerKj = 0)
         {
             Key = key;
             Tier = tier;
@@ -30,11 +31,9 @@ namespace Chemistry
             ActionEn = actionEn;
             SettingZh = settingZh;
             SettingEn = settingEn;
+            PowerKj = powerKj;
         }
 
-        internal int UnlockDay => Tier == 1 ? 1 : Tier == 2 ? 5 : 12;
-        internal string TierLabel => Tier == 1 ? Loc.Pick("前期", "Early")
-            : Tier == 2 ? Loc.Pick("中期", "Midgame") : Loc.Pick("后期", "Late");
         internal string ActionLabel => Loc.Pick(ActionZh, ActionEn);
         internal string SettingLabel => Loc.Pick(SettingZh, SettingEn);
         internal bool Adjustable => SettingZh != null || Task == EquipmentTask.Dispense || Task == EquipmentTask.Titrate;
@@ -66,29 +65,29 @@ namespace Chemistry
             new LabEquipmentDef("pipette", 1, EquipmentTask.Dispense, "定量移液", "Dispense"),
             new LabEquipmentDef("mortar_pestle", 1, EquipmentTask.SolidCycle, "研磨", "Grind", "研磨", "Grinding"),
             new LabEquipmentDef("bunsen_burner", 1, EquipmentTask.Settings, "测试火力", "Test burner", "火力", "Flame"),
-            new LabEquipmentDef("balance", 1, EquipmentTask.Weigh, "称量", "Weigh"),
+            new LabEquipmentDef("balance", 1, EquipmentTask.Weigh, "称量", "Weigh", powerKj: 1),
             new LabEquipmentDef("filter_funnel", 1, EquipmentTask.Filter, "过滤", "Filter"),
 
             new LabEquipmentDef("burette", 2, EquipmentTask.Dispense, "定量滴加", "Dispense"),
-            new LabEquipmentDef("ph_meter", 2, EquipmentTask.Acidity, "检查酸碱性", "Check acidity"),
-            new LabEquipmentDef("conductivity_meter", 2, EquipmentTask.Conductivity, "检查导电性", "Check conductivity"),
-            new LabEquipmentDef("centrifuge", 2, EquipmentTask.Clarify, "离心分离", "Centrifuge"),
-            new LabEquipmentDef("distiller", 2, EquipmentTask.Distill, "蒸发并冷凝", "Evaporate and condense", "温区", "Temperature band"),
+            new LabEquipmentDef("ph_meter", 2, EquipmentTask.Acidity, "检查酸碱性", "Check acidity", powerKj: 2),
+            new LabEquipmentDef("conductivity_meter", 2, EquipmentTask.Conductivity, "检查导电性", "Check conductivity", powerKj: 2),
+            new LabEquipmentDef("centrifuge", 2, EquipmentTask.Clarify, "离心分离", "Centrifuge", powerKj: 5),
+            new LabEquipmentDef("distiller", 2, EquipmentTask.Distill, "蒸发并冷凝", "Evaporate and condense", "温区", "Temperature band", powerKj: 6),
             new LabEquipmentDef("separating_funnel", 2, EquipmentTask.SeparateLayers, "分收上下层", "Collect both layers"),
-            new LabEquipmentDef("hotplate_stirrer", 2, EquipmentTask.Mix, "控温搅拌", "Temperature-controlled stirring", "温区", "Temperature band"),
-            new LabEquipmentDef("heating_mantle", 2, EquipmentTask.WaterCycle, "加热测试", "Test heating", "火力", "Heat"),
-            new LabEquipmentDef("fume_hood", 2, EquipmentTask.GasCollect, "排风 / 收集气体", "Ventilate / collect gas", "风量", "Airflow"),
-            new LabEquipmentDef("ultrasonic_cleaner", 2, EquipmentTask.GlasswareCycle, "清洗器皿", "Clean glassware", "清洗强度", "Cleaning intensity"),
-            new LabEquipmentDef("drying_oven", 2, EquipmentTask.Dry, "干燥回收", "Dry and recover"),
-            new LabEquipmentDef("microscope", 2, EquipmentTask.AnalyzeSolid, "观察固体", "Inspect solid"),
+            new LabEquipmentDef("hotplate_stirrer", 2, EquipmentTask.Mix, "控温搅拌", "Temperature-controlled stirring", "温区", "Temperature band", powerKj: 4),
+            new LabEquipmentDef("heating_mantle", 2, EquipmentTask.WaterCycle, "加热测试", "Test heating", "火力", "Heat", powerKj: 4),
+            new LabEquipmentDef("fume_hood", 2, EquipmentTask.GasCollect, "排风 / 收集气体", "Ventilate / collect gas", "风量", "Airflow", powerKj: 3),
+            new LabEquipmentDef("ultrasonic_cleaner", 2, EquipmentTask.GlasswareCycle, "清洗器皿", "Clean glassware", "清洗强度", "Cleaning intensity", powerKj: 3),
+            new LabEquipmentDef("drying_oven", 2, EquipmentTask.Dry, "干燥回收", "Dry and recover", powerKj: 8),
+            new LabEquipmentDef("microscope", 2, EquipmentTask.AnalyzeSolid, "观察固体", "Inspect solid", powerKj: 2),
 
             new LabEquipmentDef("titration_set", 3, EquipmentTask.Titrate, "滴加并判定终点", "Titrate and check endpoint"),
-            new LabEquipmentDef("spectrometer", 3, EquipmentTask.AnalyzeAny, "扫描成分", "Scan sample"),
-            new LabEquipmentDef("chromatograph", 3, EquipmentTask.AnalyzeFluid, "分析流体", "Analyze fluid"),
-            new LabEquipmentDef("rotary_evaporator", 3, EquipmentTask.Distill, "减压冷凝回收", "Recover under vacuum", "温区", "Temperature band"),
-            new LabEquipmentDef("freeze_dryer", 3, EquipmentTask.FreezeDry, "冻干并收集冷阱水", "Freeze-dry and recover water"),
-            new LabEquipmentDef("autoclave", 3, EquipmentTask.GlasswareCycle, "器皿灭菌", "Sterilize glassware", "循环强度", "Intensity"),
-            new LabEquipmentDef("glovebox", 3, EquipmentTask.Seal, "隔离封装 / 拆封", "Seal / reopen"),
+            new LabEquipmentDef("spectrometer", 3, EquipmentTask.AnalyzeAny, "扫描成分", "Scan sample", powerKj: 6),
+            new LabEquipmentDef("chromatograph", 3, EquipmentTask.AnalyzeFluid, "分析流体", "Analyze fluid", powerKj: 6),
+            new LabEquipmentDef("rotary_evaporator", 3, EquipmentTask.Distill, "减压冷凝回收", "Recover under vacuum", "温区", "Temperature band", powerKj: 6),
+            new LabEquipmentDef("freeze_dryer", 3, EquipmentTask.FreezeDry, "冻干并收集冷阱水", "Freeze-dry and recover water", powerKj: 10),
+            new LabEquipmentDef("autoclave", 3, EquipmentTask.GlasswareCycle, "器皿灭菌", "Sterilize glassware", "循环强度", "Intensity", powerKj: 8),
+            new LabEquipmentDef("glovebox", 3, EquipmentTask.Seal, "隔离封装 / 拆封", "Seal / reopen", powerKj: 3),
         };
 
         private static readonly Dictionary<string, LabEquipmentDef> ByKey = All.ToDictionary(def => def.Key);

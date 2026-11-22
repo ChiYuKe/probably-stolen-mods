@@ -129,6 +129,10 @@ namespace Chemistry
         internal static bool IsSolidReagent(string id) => IsSodium(id) || (id != null && id.StartsWith(CompoundPrefix, StringComparison.Ordinal)
             && Array.IndexOf(Powders, id.Substring(CompoundPrefix.Length)) >= 0);
 
+        /// <summary>是否为注册化合物物品（cmp_ 前缀且能在化合物表中找到）。</summary>
+        internal static bool IsCompound(string id) => id != null && id.StartsWith(CompoundPrefix, StringComparison.Ordinal)
+            && ChemistryCatalog.FindCompound(id.Substring(CompoundPrefix.Length)) != null;
+
         internal static bool IsSodium(string id) => id == ChemistryCatalog.ItemPrefix + Sodium;
 
         internal static bool IsGas(string key) => key is CarbonDioxide or Hydrogen;
@@ -208,10 +212,11 @@ namespace Chemistry
 
         internal static bool CanPrepare(GameItem item)
         {
-            if (item.identifier == LabMixtureData.Water || item.identifier == CompoundPrefix + Acetic
-                || LiquidComposition.HasAqueousContents(item)) return true;
-            return LiquidComposition.IsMixture(item.identifier) && item.unitCount > 0
-                && LiquidComposition.Measure(item, item.unitCount).Keys.All(id => id == LabMixtureData.Water || id == CompoundPrefix + Acetic);
+            if (item == null || item.unitCount <= 0) return false;
+            string id = item.identifier;
+            if (id == LabMixtureData.Water || id == CompoundPrefix + Acetic || LiquidComposition.HasAqueousContents(item)
+                || (ReagentBottle.IsLiquid(id) && IsCompound(id))) return true;
+            return LiquidComposition.IsMixture(item.identifier) && item.unitCount > 0;
         }
 
         internal static bool HasWater(GameItem sample) => Read(sample, sample.unitCount).TryGetValue(Water, out decimal amount) && amount > 0m;
@@ -283,8 +288,13 @@ namespace Chemistry
                 return amounts;
             }
             var stock = new Dictionary<string, decimal>();
-            if (volumes.TryGetValue(CompoundPrefix + Acetic, out decimal acid)) stock.Add(Acetic, acid);
-            if (volumes.TryGetValue(LabMixtureData.Water, out decimal solvent)) stock.Add(Water, solvent * WaterPerVolumeUnit);
+            foreach (KeyValuePair<string, decimal> entry in volumes)
+            {
+                if (!entry.Key.StartsWith(CompoundPrefix, StringComparison.Ordinal)) continue;
+                string key = entry.Key.Substring(CompoundPrefix.Length);
+                if (entry.Key == LabMixtureData.Water) Add(stock, Water, entry.Value * WaterPerVolumeUnit);
+                else if (ChemistryCatalog.FindCompound(key) != null && ReagentBottle.IsLiquid(entry.Key)) Add(stock, key, entry.Value);
+            }
             return stock;
         }
 
