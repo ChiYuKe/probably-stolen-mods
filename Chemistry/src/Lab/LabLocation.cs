@@ -26,6 +26,11 @@ namespace Chemistry
             get { return location; }
         }
 
+        internal static SpriteRenderer BackdropRenderer
+        {
+            get { return stageRenderer; }
+        }
+
         public static void Init(string modId, ModLog logger)
         {
             if (!string.IsNullOrEmpty(modId))
@@ -130,6 +135,15 @@ namespace Chemistry
                 stageRenderer = stage.AddComponent<SpriteRenderer>();
                 stageRenderer.sprite = sprite;
                 stageRenderer.sortingOrder = BackdropSortingOrder;
+
+                // Paper textures default to Bilinear in the game loader. The lab backdrop
+                // is displayed close to native resolution, so nearest sampling keeps its
+                // painted edges from being softened a second time by the renderer.
+                if (stageRenderer.sprite.texture != null)
+                {
+                    stageRenderer.sprite.texture.filterMode = FilterMode.Point;
+                    stageRenderer.sprite.texture.wrapMode = TextureWrapMode.Clamp;
+                }
 
                 FitStage(stageRenderer);
                 stage.SetActive(false);

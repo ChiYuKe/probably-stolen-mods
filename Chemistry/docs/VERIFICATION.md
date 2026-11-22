@@ -243,7 +243,9 @@ src/Data/ElementTable.cs                 ElementDef 新字段：Phase/MeltC/Boil
 「离开店铺」按钮还画在实验室场景上。
 
 原因：`LabEntranceButton`（店里「前往地下室」按钮）和 F9「去地下实验室」都直接调
-`MapUIManager.Travel()`，绕过了原版「离开店铺」流程。原版流程会调用
+`MapUIManager.Travel()`，绕过了原版「离开店铺」流程。（2026-11-23 注：该按钮已下架，
+店内入口改为桌腿通风柜 `LabEntranceVent`，IsAtStore/CanEnter 判断搬进了它里面。）
+原版流程会调用
 `EmporiumEntry.OnLeaveStore()`：快照当前打开的店铺面板 → 关闭展示柜/地面/前后柜台/垃圾桶/
 自贩机等 PixelWindow → 隐藏店内可交互物与 HUD → 触发 `OnLeavingStoreEarly/Late`。
 少了这一步，店铺 UI 不会被关闭，切场景后就留在画面上。
