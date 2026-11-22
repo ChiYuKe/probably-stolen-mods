@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest>
+  <ID>chemistry</ID>
+  <Name>化学实验台</Name>
+  <Author>Liukeyu</Author>
+  <ModVersion>0.1</ModVersion>
+  <Description>给当铺加一套化学系统：118 种元素单质、化学工具，以及按真实化学式合成的各种化合物。元素和工具会出现在垃圾场的掉落里，也可以从 F9 调试面板补给；新开一局会送一套基础试剂和玻璃器皿。按 F6 打开周期表和合成台。</Description>
+  <GameVersions>
+    <Version>0.46</Version>
+  </GameVersions>
+  <Prerequisites />
+  <Assemblies>
+    <Assembly>Chemistry.dll</Assembly>
+  </Assemblies>
+  <Capabilities />
+</Manifest>

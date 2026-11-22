@@ -1,0 +1,33 @@
+key,name_zh,name_en,category,value,desc_zh,desc_en
+beaker,烧杯,Beaker,glassware,60,最基础的玻璃器皿，配溶液、隔水加热都靠它，柜台上摆一摞永远不嫌多。,The humblest glass on the shelf. Mixing and water baths both start here.
+conical_flask,锥形瓶,Conical flask,glassware,70,底宽口窄摇一摇不洒，当铺收来的样品多半装在里面。,Wide base and narrow neck. Most samples that come through the pawnshop end up in one.
+round_flask,圆底烧瓶,Round-bottom flask,glassware,80,圆肚子受热均匀，煮沸和回流的老伙计，缺它很多反应做不成。,A round belly for even heating. The old hand for boiling and reflux.
+volumetric_flask,容量瓶,Volumetric flask,glassware,90,一条刻度定生死，配标准溶液少了它只能凭眼估，价钱也就贵在这条线上。,One line decides everything. No standard solution gets mixed without it.
+test_tube,试管,Test tube,glassware,30,一支小管子随手就能试出这瓶货是真是假，摔了也不心疼。,A little tube that tells you in seconds whether the goods are real.
+test_tube_rack,试管架,Test tube rack,glassware,45,木架一排孔，试管插上去，柜台立刻有作坊的样子。,A row of holes in wood. Pop the tubes in and the counter looks like a workshop.
+graduated_cylinder,量筒,Graduated cylinder,glassware,65,细长身子一排刻度，量体积比拿眼睛估靠谱得多。,A tall body full of marks. Far more reliable than eyeballing a volume.
+pipette,移液管,Pipette,glassware,55,一滴也算数，贵重试剂全靠它省着用。,Every drop counts. Fine reagents are rationed with this.
+burette,滴定管,Burette,glassware,120,一滴一滴往下放，终点到了就该收手，测含量的活儿离不开它。,Drip by drip until the endpoint says stop. No content test is done without it.
+petri_dish,培养皿,Petri dish,glassware,35,浅浅一碟养点什么都行，也常拿来晾干样品和分装粉末。,A shallow dish that grows anything and doubles as a drying tray.
+glass_rod,玻璃棒,Glass rod,glassware,20,不值钱的搅棍，可没有它连盐都化不开。,A cheap stirring stick. Without it even salt will not dissolve.
+watch_glass,表面皿,Watch glass,glassware,25,盖住烧杯挡灰，也能托着粉末上秤，一物两用的小件。,Covers a beaker against dust and carries powder to the scale.
+bunsen_burner,本生灯,Bunsen burner,heating,100,拧开就是蓝火苗，当铺里所有加热活儿的第一把火。,One twist and there is a blue flame. The first fire of any heating job.
+heating_mantle,加热套,Heating mantle,heating,160,把烧瓶裹进怀里慢慢煨，比明火温柔也更安全。,Wraps the flask and warms it slowly. Gentler and safer than open flame.
+crucible,坩埚,Crucible,heating,90,瓷土小碗耐得住烈火，烧完往往只剩一坨值钱的货。,A clay bowl that survives the fire and leaves something worth selling.
+mortar_pestle,研钵,Mortar and pestle,misc,40,捣碎结块的货，磨得越细卖相越好。,Grinds the clumped goods fine. The finer the powder the better it sells.
+balance,分析天平,Analytical balance,measurement,180,差一毫都不行，称贵金属和细粉全靠它，镇得住场子。,Not a hair off. Precious metal and fine powder are weighed here.
+thermometer,温度计,Thermometer,measurement,50,火候全靠这根水银柱说话，差几度就是废品和好货的分界。,The mercury column has the final say on the heat.
+ph_meter,pH计,pH meter,measurement,150,一插就知道酸还是碱，省下用舌头试的危险活儿。,One dip tells acid from base and saves your tongue the danger.
+spectrometer,光谱仪,Spectrometer,measurement,420,镇店的高价货，扫一眼就报出成分，值不值全看它说话。,The expensive piece in the shop. One scan names the contents.
+chromatograph,色谱仪,Chromatograph,measurement,380,把混在一起的货色一层层分开，谁也骗不过它。,Separates a mixed batch layer by layer. Nobody cheats this one.
+centrifuge,离心机,Centrifuge,separation,300,转起来就把重的沉的甩到底，上层清液卖相干净。,Spin it and the heavy parts sink. The clear liquid sells clean.
+distiller,蒸馏器,Distiller,separation,260,一锅浑汤进去，出来就是能卖钱的纯货，提纯的看家本事。,Murky brew goes in and pure goods worth money come out.
+separating_funnel,分液漏斗,Separating funnel,separation,85,油是油水是水，一拧开关各走各路。,Oil is oil and water is water. One turn and each takes its path.
+filter_funnel,漏斗,Filter funnel,separation,40,垫张滤纸渣子留下清液进瓶，最便宜的一道提纯。,A paper cone in it. Grit stays behind and clear liquid goes in the bottle.
+microscope,显微镜,Microscope,measurement,320,凑近看一眼假货的棱角就藏不住了，验货的硬家伙。,Take a close look and the fake's rough edges show.
+fume_hood,通风橱,Fume hood,safety,280,有毒的烟气都往柜子里抽，人站在外面安心数钱。,The poison goes up the hood while you count money outside.
+hotplate_stirrer,加热磁力搅拌器,Hotplate stirrer,heating,220,边加热边转圈，一锅反应不用人守着，省下的是时间也是命。,Heats and spins at once. A reaction that needs no babysitter.
+autoclave,高压灭菌锅,Autoclave,misc,260,高压一闷什么活物都清干净，玻璃器皿也顺带消了毒。,Pressure kills everything alive and sterilizes the glass while it is at it.
+titration_set,滴定装置,Titration set,glassware,200,滴定管锥形瓶架子配齐，测含量一步到位，整套出手更值钱。,Burette plus flask plus stand. One setup measures the content.
+goggles,护目镜,Safety goggles,safety,30,护住一对招子，溅出来的酸可不讲道理。,Guards your eyes. Splashed acid does not negotiate.
+lab_coat,实验服,Lab coat,safety,45,白大褂一穿脏东西沾在布上，别拿新衣服去赌。,The white coat takes the stain so your shirt does not.
