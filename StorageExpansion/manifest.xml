@@ -8,5 +8,7 @@
   <GameVersions><Version>0.46</Version></GameVersions>
   <Prerequisites />
   <Assemblies><Assembly>StorageExpansion.dll</Assembly></Assemblies>
-  <Capabilities />
+  <Capabilities>
+    <Capability>reflection-external</Capability>
+  </Capabilities>
 </Manifest>

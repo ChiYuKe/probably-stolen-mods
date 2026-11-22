@@ -12,5 +12,7 @@
   <Assemblies>
     <Assembly>ManualSave.dll</Assembly>
   </Assemblies>
-  <Capabilities />
+  <Capabilities>
+    <Capability>reflection-external</Capability>
+  </Capabilities>
 </Manifest>

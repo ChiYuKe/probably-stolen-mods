@@ -12,5 +12,8 @@
   <Assemblies>
     <Assembly>Chemistry.dll</Assembly>
   </Assemblies>
-  <Capabilities />
+  <Capabilities>
+    <Capability>reflection-external</Capability>
+    <Capability>files</Capability>
+  </Capabilities>
 </Manifest>

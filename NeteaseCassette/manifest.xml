@@ -14,5 +14,6 @@
   </Assemblies>
   <Capabilities>
     <Capability>network</Capability>
+    <Capability>reflection-external</Capability>
   </Capabilities>
 </Manifest>
