@@ -40,8 +40,87 @@ namespace Chemistry
 
         internal static void AddTooltip(RichTextBuilder builder, GameItem item)
         {
-            if (Describe(item.identifier) is string route)
+            string id = item.identifier;
+            if (!string.IsNullOrEmpty(id) && Elements.TryGetValue(id, out ElementDef element))
+            {
+                AddElementTooltip(builder, item, element);
+                return;
+            }
+
+            if (SampleTable.Find(id) is SampleDef sample)
+            {
+                AddSampleTooltip(builder, item, sample);
+                return;
+            }
+
+            ReagentBottle.AddAmountTooltip(builder, item);
+            if (Describe(id) is string route)
                 builder.AddLine(Loc.Pick("处理流程  ", "Workflow  ") + route, false);
+            AddMassTooltip(builder, item);
+        }
+
+        private static void AddMassTooltip(RichTextBuilder builder, GameItem item)
+        {
+            if (ItemMass.TooltipLine(item) is string mass)
+                builder.AddLine(mass, false);
+        }
+
+        private static void AddSampleTooltip(RichTextBuilder builder, GameItem item, SampleDef sample)
+        {
+            builder.AddEmptyLine(5).NextLine();
+            AddMassTooltip(builder, item);
+
+            string tool = Loc.Pick("用光谱仪检测", "Analyze with the spectrometer");
+            if (item.identifier == sample.DetectedId)
+            {
+                builder.AddEmptyLine(5).NextLine();
+                builder.AddLine(Loc.Pick("检出成分", "Detected composition"), color: RenderHandler.ColorPalette.LightCyan, bold: true);
+                foreach (var component in sample.Components)
+                {
+                    builder.AddLine(SampleTable.ElementName(component.Symbol) + "\u00a0" + component.Percent + "%");
+                }
+                builder.AddLine(Loc.Get("sample_tooltip_impurities", "杂质\u00a0{0}%", "Impurities\u00a0{0}%", sample.ImpurityPercent),
+                    color: RenderHandler.ColorPalette.VeryLightGray);
+                int acidTargets = sample.Components.Count(component => LabRefining.IsAcidTarget(sample, component.Symbol));
+                tool = acidTargets switch
+                {
+                    0 => Loc.Pick("用蒸馏器分离", "Separate with the distiller"),
+                    _ when acidTargets == sample.Components.Length => Loc.Pick("用提炼反应台回收", "Recover at the refining station"),
+                    _ => Loc.Pick("按成分选提炼反应台或蒸馏器", "Use the refining station or distiller"),
+                };
+            }
+
+            builder.AddEmptyLine(5).NextLine();
+            builder.AddLine(Loc.Get("sample_tooltip_next", "下一步  {0}", "Next  {0}", tool),
+                color: RenderHandler.ColorPalette.VeryLightCyan);
+        }
+
+        private static void AddElementTooltip(RichTextBuilder builder, GameItem item, ElementDef element)
+        {
+            builder.AddEmptyLine(5).NextLine();
+            string category = ChemistryCatalog.ElementCategoryLabel(element.Category, Loc.IsChinese);
+            builder.AddLine(Loc.Get("element_tooltip_identity", "原子序数  {0} · {1}", "Atomic no.  {0} · {1}", element.Number, category),
+                color: RenderHandler.ColorPalette.LightCyan, bold: true);
+
+            string phase = ItemRegistration.PhaseLabel(element.Phase);
+            if (!string.IsNullOrEmpty(phase))
+            {
+                builder.AddLine(ItemRegistration.HasTemperature(element.TemperatureC)
+                    ? Loc.Get("element_tooltip_phase_at", "常温状态  {0}（{1:0.#} °C）", "Phase  {0} at {1:0.#} °C", phase, element.TemperatureC)
+                    : Loc.Get("element_tooltip_phase", "状态  {0}", "Phase  {0}", phase));
+            }
+            AddMassTooltip(builder, item);
+            ReagentBottle.AddAmountTooltip(builder, item);
+
+            builder.AddEmptyLine(5).NextLine();
+            string position = Loc.Get("element_tooltip_period", "第 {0} 周期", "Period {0}", element.Period);
+            if (element.Group > 0)
+                position += Loc.Get("el_desc_group", " · 第 {0} 族", " · group {0}", element.Group);
+            builder.AddLine(position, color: RenderHandler.ColorPalette.VeryLightGray);
+            if (ItemRegistration.HasTemperature(element.MeltC))
+                builder.AddLine(Loc.Get("element_tooltip_melt", "熔点  {0:0.#} °C", "Melting point  {0:0.#} °C", element.MeltC));
+            if (ItemRegistration.HasTemperature(element.BoilC))
+                builder.AddLine(Loc.Get("element_tooltip_boil", "沸点  {0:0.#} °C", "Boiling point  {0:0.#} °C", element.BoilC));
         }
 
         internal static string Describe(string id)
@@ -56,7 +135,7 @@ namespace Chemistry
                 var equipment = LabEquipmentData.Find(tool.Key);
                 return equipment == null ? Loc.Pick("配方工具或取样器材。", "Use for recipes or sampling.")
                     : Loc.Pick("在地下实验室双击，执行「", "Double-click in the underground lab to run ") + equipment.ActionLabel
-                        + Loc.Pick($"」，第 {equipment.UnlockDay} 天解锁。", $" (day {equipment.UnlockDay}).");
+                        + Loc.Pick("」。", ".");
             }
             if (SampleTable.Find(id) is SampleDef sample)
             {
@@ -101,7 +180,9 @@ namespace Chemistry
         {
             if (AqueousReactions.IsSodium(id)) return Loc.Pick("可作为固体放入烧杯加料槽", "Load as a solid in the beaker");
             if (ReagentBottle.IsGas(id)) return Loc.Pick("可分装到采样气瓶或钢瓶，也可用色谱仪检测", "Transfer to a vial or cylinder, or analyze by chromatography");
-            if (ReagentBottle.IsLiquid(id)) return Loc.Pick("可用移液管分装、用色谱仪检测", "Aliquot with the pipette or analyze by chromatography");
+            if (ReagentBottle.IsLiquid(id))
+                return Loc.Pick("可放入烧杯加料槽参与混合，也可用移液管分装、用色谱仪检测",
+                    "Load in the beaker's ingredient slot, aliquot with the pipette or analyze by chromatography");
             return Loc.Pick("可用显微镜观察或称量", "Inspect under the microscope or weigh it");
         }
 

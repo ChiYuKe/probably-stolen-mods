@@ -229,7 +229,7 @@ namespace Chemistry
             {
                 item.identifier = sample.DetectedId;
                 item.SetName(sample.DisplayName(true));
-                item.shortDescription = sample.Report();
+                item.shortDescription = "";
                 item.longDescription = sample.Report();
                 item.Validate();
             }

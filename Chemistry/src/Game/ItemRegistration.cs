@@ -419,9 +419,8 @@ namespace Chemistry
             item.unitBaseValue = 1;
             item.unitValue = 1;
             item.unitCount = 1;
-            item.shortDescription = detected ? sample.Report() : Loc.Get("sample_item_unknown",
+            item.longDescription = detected ? sample.Report() : Loc.Get("sample_item_unknown",
                 "成分未知。带去地下实验室检测。", "Composition unknown. Analyze it in the underground lab.");
-            item.longDescription = item.shortDescription;
             EnableSupplyStacking(item);
             ApplyCommon(item, sample.SpriteKey, "CHEMICAL_SUPPLIES");
             return item;
@@ -456,10 +455,9 @@ namespace Chemistry
             item.unitBaseValue = def.Value;
             item.unitValue = def.Value;
             item.unitCount = 1;
-            item.maxSlotAmountItemFunc = (_, _, _) => LabStorage.MaxCountPerSlot;
+            item.maxSlotAmountItemFunc = (_, _, _) => ItemMass.MaxStack(def.Mass);
 
             string category = ChemistryCatalog.ElementCategoryLabel(def.Category, Loc.IsChinese);
-            item.shortDescription = BuildElementDescription(def, category);
             item.longDescription = BuildElementDescription(def, category);
             item.flavorText = BuildElementFlavor(def);
 
@@ -471,7 +469,7 @@ namespace Chemistry
         /// <summary>
         /// 元素物品的描述：身份 / 周期表位置 / 一两句简介。
         ///
-        /// 提示框突出元素身份、常温状态和温度信息；其他周期表数据仍保留在 ElementDef 中。
+        /// 供完整物品描述使用。悬停卡片由 LabWorkflow 按行绘制。
         /// </summary>
         private static string BuildElementDescription(ElementDef def, string category)
         {
@@ -555,10 +553,10 @@ namespace Chemistry
             return builder.ToString();
         }
 
-        private static bool HasTemperature(double temperature) =>
+        internal static bool HasTemperature(double temperature) =>
             !double.IsNaN(temperature) && !double.IsInfinity(temperature);
 
-        private static string PhaseLabel(string phase)
+        internal static string PhaseLabel(string phase)
         {
             switch (phase)
             {
@@ -609,6 +607,8 @@ namespace Chemistry
             item.unitCount = 1;
             // 光谱仪/蒸馏器要在店里、实验室里都能拖到样品上使用
             item.canUseOutsideCombat = true;
+            // 工具也按质量限叠：烧杯 3 件/格，天平、光谱仪这类重设备每格 1 件。
+            item.maxSlotAmountItemFunc = (_, _, _) => ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId));
 
             item.shortDescription = Loc.Get(
                 "item_tool_short",
@@ -641,8 +641,10 @@ namespace Chemistry
             LabEquipmentDef equipment = LabEquipmentData.Find(def.Key);
             if (equipment != null)
             {
-                item.shortDescription += "\n" + equipment.TierLabel + " · "
-                    + Loc.Pick($"第 {equipment.UnlockDay} 天起，双击在地下实验室操作。", $"From day {equipment.UnlockDay}. Double-click in the underground lab.");
+                item.shortDescription += "\n"
+                    + Loc.Pick("双击在地下实验室操作。", "Double-click in the underground lab.");
+                if (equipment.PowerKj > 0)
+                    item.shortDescription += "\n" + Loc.Pick("耗电设备，需装入电池。", "Battery-powered. Insert a battery to run.");
                 LabEquipmentPanel.Attach(item, equipment);
             }
 
@@ -663,6 +665,14 @@ namespace Chemistry
             item.unitBaseValue = def.Value;
             item.unitValue = def.Value;
             item.unitCount = 1;
+            // 固体化合物（1 件 = 1 mol）按式量折算堆叠上限；液体/气体是容器，仍按容量合并。
+            if (!ReagentBottle.IsLiquid(def.ItemId) && !ReagentBottle.IsGas(def.ItemId))
+            {
+                int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId));
+                item.maxSlotAmountItemFunc = (_, _, _) => maxStack;
+                item.mayStackItemFunc = (first, second) => first.identifier == second.identifier
+                    && GeneralHelper.IsItemOwned(first) == GeneralHelper.IsItemOwned(second);
+            }
 
             string category = ChemistryCatalog.CompoundCategoryLabel(def.Category, Loc.IsChinese);
             string describedFormula = def.Key == "acetic_acid"
@@ -735,7 +745,9 @@ namespace Chemistry
 
         private static void EnableSupplyStacking(GameItem item)
         {
-            item.maxSlotAmountItemFunc = (_, _, _) => LabStorage.MaxCountPerSlot;
+            // 同类型可叠，但每格总质量不超过 ItemMass.StackLimitGrams。
+            int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(item.identifier));
+            item.maxSlotAmountItemFunc = (_, _, _) => maxStack;
             item.mayStackItemFunc = (first, second) => first.identifier == second.identifier
                 && GeneralHelper.IsItemOwned(first) == GeneralHelper.IsItemOwned(second);
         }
@@ -766,6 +778,10 @@ namespace Chemistry
             {
                 ChemistryMod.Log?.Warning("贴图设置失败：" + spriteKey + " " + e.Message);
             }
+
+            // 克数写进游戏称重系统（WEIGHT_TAG），店里电子秤才能称出真实重量；
+            // 只对 chem_ 前缀的模组物品生效，原版物品不经这里。
+            ItemMass.AttachWeight(item);
         }
 
         private static GridShapeBuilder CreateFootprint(string itemId, string spriteKey)
