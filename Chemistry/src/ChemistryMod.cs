@@ -127,7 +127,8 @@ namespace Chemistry
                 UnityEngine.Object.DontDestroyOnLoad(host);
                 HotkeyWatcher watcher = host.AddComponent<HotkeyWatcher>();
                 watcher.Bind(GetHotkey, ChemistryWindow.Toggle);
-                host.AddComponent<LabEntranceButton>();
+                host.AddComponent<LabEntranceVent>();
+                host.AddComponent<LabReturnDoorButton>();
                 gameClock = host.AddComponent<GameClock>();
                 gameClock.Initialize(manifest.ID, log);
                 gameClock.RealMinutesPerDay = clockSpeed?.Value ?? 24;
@@ -146,8 +147,8 @@ namespace Chemistry
                 ModHook.OnLootTablesLoaded += OnLootTablesLoaded;
                 ModHook.OnGameLoadedInit += OnGameLoadedInit;
                 ModHook.OnGameLoadedLate += OnGameLoadedLate;
+                ModHook.OnGenerateCustomerLate += ChemistryNpcService.QueueForDay;
                 ModHook.OnNewGameStarted += OnNewGameStarted;
-                ModHook.OnCreateTooltipLate += ReagentBottle.AddAmountTooltip;
                 ModHook.OnCreateTooltipLate += LabWorkflow.AddTooltip;
             }
             catch (Exception e)
@@ -181,8 +182,8 @@ namespace Chemistry
                 ModHook.OnLootTablesLoaded -= OnLootTablesLoaded;
                 ModHook.OnGameLoadedInit -= OnGameLoadedInit;
                 ModHook.OnGameLoadedLate -= OnGameLoadedLate;
+                ModHook.OnGenerateCustomerLate -= ChemistryNpcService.QueueForDay;
                 ModHook.OnNewGameStarted -= OnNewGameStarted;
-                ModHook.OnCreateTooltipLate -= ReagentBottle.AddAmountTooltip;
                 ModHook.OnCreateTooltipLate -= LabWorkflow.AddTooltip;
             }
             catch
@@ -220,6 +221,7 @@ namespace Chemistry
 
             try
             {
+                ChemistryNpcService.Shutdown();
                 StoryService.Shutdown();
                 LabLocation.Shutdown();
             }
@@ -286,8 +288,22 @@ namespace Chemistry
         {
             gameClock?.Reset();
             ChemistryDebugWindow.Close();
+            // 读档可能发生在实验室里：场景切换把窗口销毁后 LabInventoryGrid.active 是
+            // 假 null，Close(false) 会提前返回，设备面板/反应台的状态就清不掉了，
+            // 残留条目会让下一次双击设备在 IsVisible() 上抛空引用、面板永远打不开。
+            try
+            {
+                LabEquipmentPanel.CloseAll();
+                RefiningStation.Close();
+                AcidStation.Close();
+                NitricProduction.Close();
+                IndustrialFactory.Close();
+            }
+            catch (Exception e)
+            {
+                log?.Warning("读档清理实验室窗口失败：" + e.Message);
+            }
             LabInventoryGrid.Close(false);
-            LabEquipmentPanel.ResetTestTiers();
             LabPanel.Shutdown();
             Loc.ResetLocale();
         }
@@ -311,6 +327,7 @@ namespace Chemistry
             try
             {
                 LabStorage.EnsureLoaded();
+                LabWarehouses.EnsureLoaded();
                 StoryService.EnsureLoaded();
                 LabLocation.EnsureBackdrop();
                 SampleInteraction.AttachExistingTools();
@@ -337,6 +354,7 @@ namespace Chemistry
             try
             {
                 LabStorage.EnsureLoaded();
+                LabWarehouses.EnsureLoaded();
                 StoryService.EnsureLoaded();
             }
             catch (Exception e)
