@@ -25,12 +25,17 @@ namespace Chemistry
         public const int MaxCountPerSlot = 999;
 
         /// <summary>ModHelper 存档数据 key：内容形如 "chem_el_h:12|chem_tool_beaker:1"。</summary>
-        private const string DataKey = "lab_slots";
+        internal const string DataKey = "lab_slots";
 
         private static LabSlot[] slots = CreateSlots();
         private static bool loaded;
         internal static string BottleLayout { get; private set; } = "";
         internal static string LineLayout { get; private set; } = "";
+
+        /// <summary>电池等电源物品的逐件明细（id@电量:数量），随储物格一起存档。
+        /// 电源不在化学白名单里，单独走这一段，避免挡掉整次保存。</summary>
+        internal static string PowerLayout { get; private set; } = "";
+        internal static string EquipmentLayout { get; private set; } = "";
 
         internal static void ConfigureCapacityBonus(int bonus)
         {
@@ -127,6 +132,8 @@ namespace Chemistry
             ClearSlots();
             BottleLayout = "";
             LineLayout = "";
+            PowerLayout = "";
+            EquipmentLayout = "";
 
             try
             {
@@ -138,7 +145,19 @@ namespace Chemistry
                     int lineBoundary = raw.IndexOf('~', boundary + 1);
                     BottleLayout = lineBoundary < 0 ? raw.Substring(boundary + 1)
                         : raw.Substring(boundary + 1, lineBoundary - boundary - 1);
-                    if (lineBoundary >= 0) LineLayout = raw.Substring(lineBoundary + 1);
+                    if (lineBoundary >= 0)
+                    {
+                        int powerBoundary = raw.IndexOf('~', lineBoundary + 1);
+                        LineLayout = powerBoundary < 0 ? raw.Substring(lineBoundary + 1)
+                            : raw.Substring(lineBoundary + 1, powerBoundary - lineBoundary - 1);
+                        if (powerBoundary >= 0)
+                        {
+                            int equipmentBoundary = raw.IndexOf('~', powerBoundary + 1);
+                            PowerLayout = equipmentBoundary < 0 ? raw.Substring(powerBoundary + 1)
+                                : raw.Substring(powerBoundary + 1, equipmentBoundary - powerBoundary - 1);
+                            if (equipmentBoundary >= 0) EquipmentLayout = raw.Substring(equipmentBoundary + 1);
+                        }
+                    }
                 }
             }
             catch (Exception e)
@@ -146,6 +165,8 @@ namespace Chemistry
                 ClearSlots();
                 BottleLayout = "";
                 LineLayout = "";
+                PowerLayout = "";
+                EquipmentLayout = "";
                 Debug.LogWarning("[Chemistry] 读取实验室储物格失败，按空处理：" + e.Message);
             }
         }
@@ -264,16 +285,8 @@ namespace Chemistry
                     builder.Append(slot.ItemId).Append(':').Append(count.ToString(CultureInfo.InvariantCulture));
                 }
 
-                if (BottleLayout.Length != 0 || LineLayout.Length != 0)
-                {
-                    if (builder.Length > 0) builder.Append('|');
-                    builder.Append('~').Append(BottleLayout);
-                }
-                if (LineLayout.Length != 0)
-                {
-                    builder.Append('~').Append(LineLayout);
-                }
-                ModHelper.SetModData(ChemistryCatalog.ModId, DataKey, builder.ToString());
+                ModHelper.SetModData(ChemistryCatalog.ModId, DataKey,
+                    WithLayouts(builder.ToString(), BottleLayout, LineLayout, PowerLayout));
                 LabInventoryGrid.StorageSaved();
                 return true;
             }
@@ -284,6 +297,12 @@ namespace Chemistry
             }
         }
 
+        private static string WithLayouts(string counts, string bottles, string lines, string power) =>
+            EquipmentLayout.Length > 0 ? $"{counts}~{bottles}~{lines}~{power}~{EquipmentLayout}" :
+            power.Length > 0 ? $"{counts}~{bottles}~{lines}~{power}" :
+            lines.Length > 0 ? $"{counts}~{bottles}~{lines}" :
+            bottles.Length > 0 ? $"{counts}~{bottles}" : counts;
+
         /// <summary>调试用：清空全部格子并写回存档。</summary>
         public static void ResetAll()
         {
@@ -291,6 +310,8 @@ namespace Chemistry
             ClearSlots();
             BottleLayout = "";
             LineLayout = "";
+            PowerLayout = "";
+            EquipmentLayout = "";
             Save();
         }
 
@@ -396,7 +417,8 @@ namespace Chemistry
             return needed;
         }
 
-        public static bool TryStoreGridCounts(Dictionary<string, int> counts, string bottleLayout, string lineLayout)
+        public static bool TryStoreGridCounts(Dictionary<string, int> counts, string bottleLayout, string lineLayout,
+            string powerLayout, string equipmentLayout)
         {
             if (!loaded || SlotsNeeded(counts) > Capacity)
             {
@@ -413,8 +435,12 @@ namespace Chemistry
             var original = SnapshotSlots();
             string previousLayout = BottleLayout;
             string previousLine = LineLayout;
+            string previousPower = PowerLayout;
+            string previousEquipment = EquipmentLayout;
             BottleLayout = bottleLayout;
             LineLayout = lineLayout;
+            PowerLayout = powerLayout ?? "";
+            EquipmentLayout = equipmentLayout;
             ClearSlots();
             foreach (KeyValuePair<string, int> entry in counts)
             {
@@ -428,6 +454,8 @@ namespace Chemistry
             RestoreSlots(original);
             BottleLayout = previousLayout;
             LineLayout = previousLine;
+            PowerLayout = previousPower;
+            EquipmentLayout = previousEquipment;
             return false;
         }
 

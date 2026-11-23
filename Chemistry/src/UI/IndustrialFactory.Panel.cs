@@ -110,7 +110,7 @@ namespace Chemistry
             SetButton(start, automatic ? Loc.Pick("暂停联机", "Pause line") : Loc.Pick("启动联机", "Start line"), !automatic && missing != null);
             SetButton(route, Recipe.Name, automatic || Units(buffer) > 0);
             SetButton(limit, Loc.Pick($"库存上限 {stockLimit}", $"Stock limit {stockLimit}"), false);
-            SetButton(assemble, Loc.Pick("组装厂房 · 6 机件", "Build workshop · 6 parts"), Installed || !Unlocked);
+            SetButton(assemble, Loc.Pick("组装厂房 · 6 机件", "Build workshop · 6 parts"), !CanConstructFrame || !Unlocked);
             SetButton(assembleTransport, Loc.Pick("组装管路 · 3 机件", "Build manifold · 3 parts"), !Unlocked);
         }
 

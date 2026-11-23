@@ -8,8 +8,9 @@ namespace Chemistry
 {
     internal sealed partial class IndustrialFactory
     {
-        private static IndustrialFactory active;
+        private static readonly Dictionary<int, IndustrialFactory> Factories = new Dictionary<int, IndustrialFactory>();
         private readonly LabInventoryGrid grid;
+        private int frameId;
         private readonly List<GameInventory> inventories = new List<GameInventory>();
         private int routeIndex;
         private int stockLimit = DefaultLimit;
@@ -30,14 +31,22 @@ namespace Chemistry
             internal void Reset() { Started = 0; Sample = null; }
         }
 
-        private IndustrialFactory(LabInventoryGrid grid) => this.grid = grid;
+        private IndustrialFactory(LabInventoryGrid grid, int frameId)
+        {
+            this.grid = grid;
+            this.frameId = frameId;
+        }
         private Route Recipe => Routes[routeIndex];
-        private bool Installed => grid.StorageInventoryArea.childItems.Any(item => item.identifier == Frame);
-        private bool Unlocked => LabEquipmentPanel.IsTierUnlocked(3, UnlockDay);
+        private bool Installed => frameId > 0 && grid.StorageInventoryArea.childItems.Any(item => item.uniqueId == frameId && item.identifier == Frame);
+        private bool CanConstructFrame => !grid.StorageInventoryArea.childItems.Any(item => item.identifier == Frame);
+        private bool Unlocked => Math.Max(1, StoreStation.GetDayCounter()) >= UnlockDay;
         private static bool Dragging => ItemMouseDragHandler.current?.IsDraggingItem == true;
-        internal static IReadOnlyList<GameInventory> Inventories => active?.inventories ?? (IReadOnlyList<GameInventory>)Array.Empty<GameInventory>();
-        internal static bool UsesMachine(GameItem item) => active != null
-            && (active.preparation.childItem == item || active.dryer.childItem == item);
+        internal static IEnumerable<GameInventory> Inventories => Factories.Values.SelectMany(factory => factory.inventories);
+        internal static IEnumerable<(int Owner, int Index, GameInventory Inventory)> OwnedInventories =>
+            Factories.Values.OrderBy(factory => factory.frameId)
+                .SelectMany(factory => factory.inventories.Select((inventory, index) => (factory.frameId, index, inventory)));
+        internal static bool UsesMachine(GameItem item) => Factories.Values.Any(factory =>
+            factory.preparation.childItem == item || factory.dryer.childItem == item);
 
         internal static void Attach(GameItem frame)
         {
@@ -46,7 +55,7 @@ namespace Chemistry
             {
                 launcher.Hide();
                 LabInventoryGrid current = LabInventoryGrid.OpenGrid;
-                if (current != null && frame.parentInventory == current.StorageInventoryArea) Open();
+                if (current != null && frame.parentInventory == current.StorageInventoryArea) Open(frame);
                 else OverlayHandler.current?.AppendLog(Loc.Pick("请先把厂房放入地下实验室储物格。",
                     "Place the workshop in underground lab storage first."), false);
             };
@@ -56,55 +65,78 @@ namespace Chemistry
 
         internal static void Open()
         {
+            Open(LabInventoryGrid.OpenGrid?.StorageInventoryArea.childItems.FirstOrDefault(item => item.identifier == Frame));
+        }
+
+        private static void Open(GameItem frame)
+        {
             LabInventoryGrid grid = LabInventoryGrid.OpenGrid;
-            if (grid == null || Dragging || !EnsureCreated(grid)) return;
+            if (grid == null || Dragging) return;
+            IndustrialFactory factory = GetOrCreate(grid, frame?.GetUniqueID() ?? 0);
+            if (factory == null) return;
             LabPanel.Shutdown();
             AcidStation.Hide();
             NitricProduction.Hide();
-            active.window.Show();
-            active.window.Center();
-            active.window.FixBounds();
-            active.Refresh();
+            factory.window.Show();
+            factory.window.Center();
+            factory.window.FixBounds();
+            factory.Refresh();
         }
 
-        private static bool EnsureCreated(LabInventoryGrid grid)
+        private static IndustrialFactory GetOrCreate(LabInventoryGrid grid, int id, bool claimUnbound = true)
         {
-            if (active != null) return true;
-            var factory = new IndustrialFactory(grid);
+            if (Factories.TryGetValue(id, out IndustrialFactory factory)) return factory;
+            if (claimUnbound && id > 0 && Factories.TryGetValue(0, out factory))
+            {
+                Factories.Remove(0);
+                factory.frameId = id;
+                Factories.Add(id, factory);
+                return factory;
+            }
+            factory = new IndustrialFactory(grid, id);
             try
             {
                 factory.Build();
-                active = factory;
-                return true;
+                Factories.Add(id, factory);
+                return factory;
             }
             catch (Exception error)
             {
                 factory.window?.Destroy();
                 ChemistryMod.Log?.Warning("无法创建自动化厂房：" + error);
-                return false;
+                return null;
             }
         }
 
         internal static void Close()
         {
-            IndustrialFactory closing = active;
-            active = null;
-            if (closing == null) return;
-            foreach (GameInventory inventory in closing.inventories)
+            var closing = Factories.Values.ToArray();
+            Factories.Clear();
+            foreach (IndustrialFactory factory in closing)
             {
-                foreach (GameItem item in inventory.childItems.ToArray()) item.Destroy();
+                foreach (GameInventory inventory in factory.inventories)
+                {
+                    foreach (GameItem item in inventory.childItems.ToArray())
+                    {
+                        if (item == null || (item.contentWindow != null && item.contentWindow.handler == null)) continue;
+                        item.Destroy();
+                    }
+                }
+                if (factory.window?.handler != null) factory.window.Destroy();
             }
-            closing.window.Destroy();
         }
 
         internal static void Update()
         {
-            if (active == null || Dragging) return;
+            if (Factories.Count == 0 || Dragging) return;
             long now = GameTicks.Now;
-            if (now < active.nextTick) return;
-            active.nextTick = now + 2;
-            if (active.automatic) active.Tick(now);
-            if (active.window.IsVisible()) active.Refresh();
+            foreach (IndustrialFactory factory in Factories.Values)
+            {
+                if (now < factory.nextTick) continue;
+                factory.nextTick = now + 2;
+                if (factory.automatic) factory.Tick(now);
+                if (factory.window.IsVisible()) factory.Refresh();
+            }
         }
 
         private string HardwareBlocker()
@@ -206,7 +238,7 @@ namespace Chemistry
 
         private void Construct(string id, int parts)
         {
-            if (!Unlocked || Dragging || (id == Frame && Installed)) return;
+            if (!Unlocked || Dragging || (id == Frame && !CanConstructFrame)) return;
             var inputs = new List<(GameItem, int)>();
             if (!MachineBatch.AddInputs(inputs, grid.StorageInventoryArea, NitricProductionData.Parts, parts))
             {
@@ -218,29 +250,20 @@ namespace Chemistry
                 : Loc.Pick("组装失败，请检查储物空间", "Assembly failed. Check storage space.");
         }
 
-        internal static string Capture()
+        internal static string Capture() => string.Join("^", Factories.Values.OrderBy(factory => factory.frameId).Select(factory => factory.CaptureFactory()));
+
+        private string CaptureFactory()
         {
-            if (active == null) return "";
-            var factory = active;
-            var slots = factory.inventories.SelectMany((inventory, index) => inventory.childItems
+            var slots = inventories.SelectMany((inventory, index) => inventory.childItems
                 .OrderBy(item => item.identifier, StringComparer.Ordinal).ThenBy(item => item.unitCount).ThenBy(ReagentBottle.SizeOf)
                 .Select(item => $"{index},{item.identifier},{item.unitCount},{(ReagentBottle.IsBottle(item.identifier) ? ReagentBottle.SizeOf(item) : -1)}"
                     + (ReagentBottle.SavedComposition(item) is string composition ? "," + composition : "")));
-            return $"1,{factory.routeIndex},{factory.stockLimit},{(factory.automatic ? 1 : 0)};" + string.Join(";", slots);
+            return $"2,{routeIndex},{stockLimit},{(automatic ? 1 : 0)},{frameId};" + string.Join(";", slots);
         }
 
-        internal static void Restore(LabInventoryGrid grid, string layout)
+        internal static void Restore(LabInventoryGrid grid, string layout, HashSet<(int Id, string Item)> owners)
         {
             if (string.IsNullOrEmpty(layout)) return;
-            string[] records = layout.Split(';');
-            string[] header = records[0].Split(',');
-            if (header.Length != 4 || header[0] != "1" || !int.TryParse(header[1], out int recipe)
-                || recipe < 0 || recipe >= Routes.Length || !int.TryParse(header[2], out int limit)
-                || !EnsureCreated(grid)) return;
-            var factory = active;
-            factory.routeIndex = recipe;
-            factory.stockLimit = Mathf.Clamp(limit, 2, MaxLimit);
-            factory.automatic = header[3] == "1";
             var counts = LabStorage.Counts();
             foreach (GameInventory inventory in NitricProduction.Inventories)
             {
@@ -249,6 +272,27 @@ namespace Chemistry
                     if (counts.TryGetValue(item.identifier, out int available)) counts[item.identifier] = available - item.unitCount;
                 }
             }
+            foreach (string entry in layout.Split('^'))
+                RestoreFactory(grid, entry, counts, owners);
+        }
+
+        private static void RestoreFactory(LabInventoryGrid grid, string layout, Dictionary<string, int> counts,
+            HashSet<(int Id, string Item)> owners)
+        {
+            string[] records = layout.Split(';');
+            string[] header = records[0].Split(',');
+            int id = 0;
+            bool legacy = header.Length == 4 && header[0] == "1";
+            if (!legacy && (header.Length != 5 || header[0] != "2" || !int.TryParse(header[4], out id) || id < 0)) return;
+            if (id > 0 && !owners.Contains((id, Frame))) return;
+            if (!int.TryParse(header[1], out int recipe) || recipe < 0 || recipe >= Routes.Length
+                || !int.TryParse(header[2], out int limit)) return;
+            // 读档保留未绑定的旧厂房，等玩家打开一座实体厂房再认领。
+            IndustrialFactory factory = GetOrCreate(grid, id, claimUnbound: false);
+            if (factory == null) return;
+            factory.routeIndex = recipe;
+            factory.stockLimit = Mathf.Clamp(limit, 2, MaxLimit);
+            factory.automatic = header[3] == "1";
             factory.restoring = true;
             try
             {
@@ -262,6 +306,13 @@ namespace Chemistry
             {
                 factory.restoring = false;
             }
+        }
+
+        internal static void BindLegacyFrame()
+        {
+            if (!Factories.TryGetValue(0, out var unbound)) return;
+            var frames = unbound.grid.StorageInventoryArea.childItems.Where(item => item.identifier == Frame).Take(2).ToArray();
+            if (frames.Length == 1) GetOrCreate(unbound.grid, frames[0].GetUniqueID());
         }
 
         private void RestoreSlot(string record, Dictionary<string, int> counts)

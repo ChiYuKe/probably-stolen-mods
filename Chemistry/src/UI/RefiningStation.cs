@@ -33,11 +33,19 @@ namespace Chemistry
         private static string FunnelId => ChemistryCatalog.ToolItemId(LabRefining.FilterToolKey);
         internal static IReadOnlyList<GameInventory> Inventories => active?.inventories ?? Array.Empty<GameInventory>();
 
+        internal static IReadOnlyList<GameInventory> PortableSlots(GameItem item)
+        {
+            if (item.identifier != ItemId) return Array.Empty<GameInventory>();
+            var station = item.contentWindow?.handler?.GetComponent<RefiningStation>();
+            return station != null && !station.IsFixture ? station.inventories : Array.Empty<GameInventory>();
+        }
+
         private bool IsFixture => active == this;
         private bool IsOperational => LabInventoryGrid.OpenGrid != null && machine.parentInventory != null;
 
         internal static void Attach(GameItem item)
         {
+            item.mayStackItemFunc = (_, _) => false;
             var panel = new PixelWindow(true, item.name, WindowStyle.Machinery);
             var station = panel.handler.gameObject.AddComponent<RefiningStation>();
             station.window = panel;
@@ -280,9 +288,10 @@ namespace Chemistry
 
         public static void Close()
         {
+            // 读档/切场景可能已把窗口整个销毁（假 null），IsVisible 会在这里炸。
             foreach (RefiningStation station in openStations)
             {
-                if (station != null && station.window.IsVisible())
+                if (station != null && station.window != null && station.window.handler != null && station.window.IsVisible())
                 {
                     station.window.Hide();
                 }
@@ -294,7 +303,10 @@ namespace Chemistry
             }
             RefiningStation closing = active;
             active = null;
-            closing.machine.Destroy();
+            if (closing.machine != null && (closing.machine.contentWindow == null || closing.machine.contentWindow.handler != null))
+            {
+                closing.machine.Destroy();
+            }
             fixtureDock?.Destroy();
             fixtureDock = null;
         }

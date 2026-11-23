@@ -61,7 +61,7 @@ namespace Chemistry
             launcher.openCallback = () =>
             {
                 launcher.Hide();
-                if (!Open() && LabInventoryGrid.OpenGrid == null)
+                if (item != fixture || !Open())
                 {
                     OverlayHandler.current?.AppendLog(RequiredMachine, false);
                 }
@@ -121,7 +121,7 @@ namespace Chemistry
         private static bool CanDropOnMachine(GameItem source, GameItem target)
         {
             LabInventoryGrid grid = LabInventoryGrid.OpenGrid;
-            return grid != null && target != null && (target == fixture || grid.Contains(target))
+            return grid != null && target != null && target == fixture
                 && source != null && grid.Contains(source)
                 && (ReagentBottle.IsGlassEmpty(source.identifier) || ReagentBottle.IsPlasticEmpty(source.identifier) || Recipes.Any(recipe =>
                     recipe.Tools.Any(tool => MatchesTool(source, tool))));
@@ -161,27 +161,9 @@ namespace Chemistry
             {
                 return NitricProduction.Open(onBack ?? RefiningStation.Open);
             }
-            if (LabInventoryGrid.OpenGrid == null || Dragging())
+            if (LabInventoryGrid.OpenGrid == null || Dragging() || !EnsureCreated())
             {
                 return false;
-            }
-            if (active == null)
-            {
-                var panel = new PixelWindow(true, Loc.Pick("制酸装置", "Acid preparation"), WindowStyle.Machinery);
-                AcidStation station = panel.handler.gameObject.AddComponent<AcidStation>();
-                station.window = panel;
-                try
-                {
-                    station.Build();
-                    panel.Hide();
-                    active = station;
-                }
-                catch (Exception error)
-                {
-                    panel.Destroy();
-                    ChemistryMod.Log?.Warning("创建制酸装置失败：" + error);
-                    return false;
-                }
             }
 
             if (preferred != null && HasRecipe(preferred) && !active.running)
@@ -203,11 +185,39 @@ namespace Chemistry
             return true;
         }
 
+        internal static GameInventory RestoreSlot(int index) =>
+            EnsureCreated() && index >= 0 && index < active.inventories.Length ? active.inventories[index] : null;
+
+        private static bool EnsureCreated()
+        {
+            if (active != null) return true;
+            var panel = new PixelWindow(true, Loc.Pick("制酸装置", "Acid preparation"), WindowStyle.Machinery);
+            AcidStation station = panel.handler.gameObject.AddComponent<AcidStation>();
+            station.window = panel;
+            try
+            {
+                station.Build();
+                panel.Hide();
+                active = station;
+                return true;
+            }
+            catch (Exception error)
+            {
+                panel.Destroy();
+                ChemistryMod.Log?.Warning("创建制酸装置失败：" + error);
+                return false;
+            }
+        }
+
         internal static void Hide() => active?.window.Hide();
 
         internal static void Close()
         {
-            fixture?.Destroy();
+            // fixture 是 Unity 对象：场景销毁后是假 null，`?.` 拦不住，Destroy 里的 Hide 会炸。
+            if (fixture != null && (fixture.contentWindow == null || fixture.contentWindow.handler != null))
+            {
+                fixture.Destroy();
+            }
             fixtureDock?.Destroy();
             fixture = null;
             fixtureDock = null;
@@ -221,6 +231,8 @@ namespace Chemistry
             {
                 foreach (GameItem item in area.childItems.ToArray())
                 {
+                    // 读档时物品或其 contentWindow 可能已被场景销毁（假 null），Destroy 会炸。
+                    if (item == null || (item.contentWindow != null && item.contentWindow.handler == null)) continue;
                     item.Destroy();
                 }
             }
