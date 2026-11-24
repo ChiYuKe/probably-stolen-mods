@@ -38,3 +38,7 @@ Chemistry/tools/
 
 # 导入工具跑出来的临时目录（带随机后缀）
 .basement-import-*/
+lab-art-transfer-*/
+
+# 本地开发用的预览工具，跟 mod 源码无关
+/tools/
