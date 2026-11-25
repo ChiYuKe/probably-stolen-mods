@@ -85,6 +85,31 @@ namespace Chemistry
             spritesRegistered = false;
         }
 
+        /// <summary>
+        /// 给别的模块复用同一批立绘（委托 NPC 也用老锈、白鸦这几张）。
+        /// 取不到贴图时返回 null，调用方回落到原版随机立绘。
+        /// </summary>
+        public static string EnsureNpcSprite(string npcId)
+        {
+            if (string.IsNullOrEmpty(npcId)) return null;
+
+            try
+            {
+                EnsureSpritesRegistered();
+                if (SpriteDict.Instance == null) return null;
+                for (int i = 0; i < Stages.Length; i++)
+                {
+                    if (Stages[i].Id == npcId) return SpritePrefix + npcId;
+                }
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("复用 NPC 立绘失败：" + e.Message);
+            }
+
+            return null;
+        }
+
         private static bool IsChapterUnlocked(string id)
         {
             IList<StoryChapter> chapters = StoryService.Chapters;
