@@ -117,6 +117,7 @@ namespace Chemistry
         public static void Shutdown()
         {
             CompendiumPanel.CloseReactionBook();
+            OrderPanel.Shutdown();
             Close();
             ChemUi.InvalidateCounts();
         }
@@ -175,6 +176,11 @@ namespace Chemistry
             CompendiumPanel.BuildPage(builder, window);
             builder.End();
 
+            builder.BeginTab(Loc.Get("tab_orders", "委托", "Orders"));
+            MakePageFlexible(builder);
+            OrderPanel.BuildPage(builder, window);
+            builder.End();
+
             builder.EndTabs();
 
             builder.Show();
@@ -196,6 +202,15 @@ namespace Chemistry
             catch (Exception e)
             {
                 log?.Warning("填充图鉴失败：" + e.Message);
+            }
+
+            try
+            {
+                OrderPanel.Refresh(false);
+            }
+            catch (Exception e)
+            {
+                log?.Warning("填充委托记录失败：" + e.Message);
             }
         }
 
@@ -226,6 +241,15 @@ namespace Chemistry
             catch (Exception e)
             {
                 log?.Warning("刷新图鉴失败：" + e.Message);
+            }
+
+            try
+            {
+                OrderPanel.Refresh(false);
+            }
+            catch (Exception e)
+            {
+                log?.Warning("刷新委托记录失败：" + e.Message);
             }
         }
 

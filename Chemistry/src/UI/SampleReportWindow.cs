@@ -42,7 +42,7 @@ namespace Chemistry
                 }
 
                 detectWindow = builder.Handle;
-                builder.SetSize(560f, 436f);
+                builder.SetSize(560f, 476f);
                 builder.SetDraggable(true);
                 builder.SetCloseOnEscape(true);
 
@@ -75,6 +75,23 @@ namespace Chemistry
                         : Loc.Get("sample_report_distill_hint", "把蒸馏器拖到样品上，选择要分离的成分。",
                             "Drag the Distiller onto the sample and select a component to separate."),
                     null, 11.5f, 520f, 36f, true, ChemUi.Dim, false, TextAlignmentOptions.TopLeft);
+
+                // 委托相关：这批料对本单够不够、缺什么、去哪个工位
+                string advice = "";
+                try
+                {
+                    advice = OrderService.SampleAdvice(sample);
+                }
+                catch (Exception e)
+                {
+                    ChemUi.Log?.Warning("读取委托提示失败：" + e.Message);
+                }
+
+                if (!string.IsNullOrEmpty(advice))
+                {
+                    LabUi.Label(builder, advice, null, 11.5f, 520f, 32f, true, ChemUi.Accent, true,
+                        TextAlignmentOptions.TopLeft);
+                }
 
                 LabUi.Button(builder, Loc.Get("sample_close", "关闭", "Close"), CloseDetect, 110f, 30f, true, "");
                 builder.Show();

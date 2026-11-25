@@ -159,6 +159,11 @@ namespace Chemistry
                 BuildProcessGuide(builder);
                 builder.End();
 
+                builder.BeginTab(Loc.Get("lab_tab_orders", "委托", "Orders"));
+                MakePageFlexible(builder);
+                OrderPanel.BuildPage(builder, window);
+                builder.End();
+
                 builder.BeginTab(Loc.Get("lab_tab_storage", "储物格", "Storage"));
                 MakePageFlexible(builder);
                 BuildStoragePage(builder);
@@ -192,6 +197,15 @@ namespace Chemistry
             ResetRefiningPage();
             lastBenchMessage = "";
             lastStorageMessage = "";
+            try
+            {
+                OrderPanel.Detach(closing);
+            }
+            catch
+            {
+                // 委托页没建起来时忽略
+            }
+
             if (closing != null && closing.IsAlive)
             {
                 closing.Close();
@@ -299,6 +313,8 @@ namespace Chemistry
             RefreshStorage(resetScroll);
             RefreshArchive(resetScroll);
             RefreshRefining();
+            RefreshObjective();
+            OrderPanel.Refresh(resetScroll);
         }
 
         private static void RefreshSummary()

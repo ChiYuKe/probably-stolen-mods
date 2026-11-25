@@ -148,6 +148,7 @@ namespace Chemistry
                 ModHook.OnGameLoadedInit += OnGameLoadedInit;
                 ModHook.OnGameLoadedLate += OnGameLoadedLate;
                 ModHook.OnGenerateCustomerLate += ChemistryNpcService.QueueForDay;
+                ModHook.OnGenerateCustomerLate += OrderNpcService.QueueForDay;
                 ModHook.OnNewGameStarted += OnNewGameStarted;
                 ModHook.OnCreateTooltipLate += LabWorkflow.AddTooltip;
             }
@@ -167,6 +168,16 @@ namespace Chemistry
                 log.Error("初始化地下实验室失败：" + e);
             }
 
+            // 委托系统：接单 / 进度 / 结算
+            try
+            {
+                OrderService.Init(manifest.ID, log);
+            }
+            catch (Exception e)
+            {
+                log.Error("初始化委托系统失败：" + e);
+            }
+
             RegisterDebugFunctions();
         }
 
@@ -183,6 +194,7 @@ namespace Chemistry
                 ModHook.OnGameLoadedInit -= OnGameLoadedInit;
                 ModHook.OnGameLoadedLate -= OnGameLoadedLate;
                 ModHook.OnGenerateCustomerLate -= ChemistryNpcService.QueueForDay;
+                ModHook.OnGenerateCustomerLate -= OrderNpcService.QueueForDay;
                 ModHook.OnNewGameStarted -= OnNewGameStarted;
                 ModHook.OnCreateTooltipLate -= LabWorkflow.AddTooltip;
             }
@@ -224,6 +236,8 @@ namespace Chemistry
                 ChemistryNpcService.Shutdown();
                 StoryService.Shutdown();
                 LabLocation.Shutdown();
+                OrderNpcService.Shutdown();
+                OrderService.Shutdown();
             }
             catch
             {
@@ -329,6 +343,7 @@ namespace Chemistry
                 LabStorage.EnsureLoaded();
                 LabWarehouses.EnsureLoaded();
                 StoryService.EnsureLoaded();
+                OrderService.EnsureLoaded();
                 LabLocation.EnsureBackdrop();
                 SampleInteraction.AttachExistingTools();
                 ItemRegistration.RestoreSavedFootprints();
@@ -356,6 +371,7 @@ namespace Chemistry
                 LabStorage.EnsureLoaded();
                 LabWarehouses.EnsureLoaded();
                 StoryService.EnsureLoaded();
+                OrderService.EnsureLoaded();
             }
             catch (Exception e)
             {
@@ -414,6 +430,13 @@ namespace Chemistry
                 {
                     host.AddComponent<ChemistryDebugButton>().Bind(label);
                 }
+
+                ModHelper.AddDebugFunction(manifest.ID, ModHelper.DEBUG_CATEGORY_SPECIAL,
+                    "化学：委托记录 · open orders", OrderPanel.Open);
+                ModHelper.AddDebugFunction(manifest.ID, ModHelper.DEBUG_CATEGORY_SPECIAL,
+                    "化学：元素渠道盘点 · element sources", ElementSources.LogReport);
+                ModHelper.AddDebugFunction(manifest.ID, ModHelper.DEBUG_CATEGORY_SPECIAL,
+                    "化学：重置委托 · reset orders", OrderService.ResetForDebug);
             }
             catch (Exception e)
             {
