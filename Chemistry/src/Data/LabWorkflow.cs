@@ -121,6 +121,22 @@ namespace Chemistry
                 builder.AddLine(Loc.Get("element_tooltip_melt", "熔点  {0:0.#} °C", "Melting point  {0:0.#} °C", element.MeltC));
             if (ItemRegistration.HasTemperature(element.BoilC))
                 builder.AddLine(Loc.Get("element_tooltip_boil", "沸点  {0:0.#} °C", "Boiling point  {0:0.#} °C", element.BoilC));
+
+            // 垃圾场不再直掉单质之后，元素从哪来必须写在物品提示里
+            try
+            {
+                string source = ElementSources.Describe(element.Symbol);
+                if (!string.IsNullOrEmpty(source))
+                {
+                    builder.AddEmptyLine(5).NextLine();
+                    builder.AddLine(Loc.Pick("来源  ", "Source  ") + source,
+                        color: RenderHandler.ColorPalette.VeryLightCyan);
+                }
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("列元素来源失败：" + e.Message);
+            }
         }
 
         internal static string Describe(string id)
@@ -128,8 +144,25 @@ namespace Chemistry
             if (string.IsNullOrEmpty(id)) return null;
             if (Compounds.TryGetValue(id, out CompoundDef compound)) return CompoundRoute(compound);
             if (Elements.ContainsKey(id))
-                return Loc.Pick("可在垃圾场找到元素样品。", "Find element samples at the dumping ground. ")
+            {
+                string source;
+                try
+                {
+                    source = ElementSources.Describe(Elements[id].Symbol);
+                }
+                catch
+                {
+                    source = null;
+                }
+
+                if (string.IsNullOrEmpty(source))
+                {
+                    source = Loc.Pick("从垃圾场样品里提炼。", "Recover it from dumping-ground samples. ");
+                }
+
+                return Loc.Pick("来源：", "Source: ") + source + Loc.Pick("。", ".")
                     + MaterialHandling(id) + Loc.Pick("，也可用于配方合成。", ", or use it in synthesis.");
+            }
             if (Tools.TryGetValue(id, out ToolDef tool))
             {
                 var equipment = LabEquipmentData.Find(tool.Key);

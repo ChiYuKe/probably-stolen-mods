@@ -13,7 +13,11 @@ namespace Chemistry
     {
         public const string SampleTableId = "chemSampleTable";
         public const string CompoundTableId = "chemCompoundTable";
-        private const string ElementTableId = "chemElementTable";
+        /// <summary>
+        /// 早期版本把 118 种单质直接挂进普通垃圾场（权重 8）。M1 起不再直掉：
+        /// 元素只能从样品提炼或原料采购拿到。这里保留常量只用于清理旧存档/旧版本残留的挂载。
+        /// </summary>
+        private const string LegacyElementTableId = "chemElementTable";
 
         /// <summary>样品表塞进哪个表组：普通垃圾场 + 新货垃圾场。</summary>
         private const string DumpingGroundGroup = "dumpingGroundTG";
@@ -40,10 +44,11 @@ namespace Chemistry
             {
                 RegisterSampleTable();
                 RegisterCompoundTable();
-                RegisterElementTable();
+                RemoveLegacyElementTable();
                 AddToolsToVanillaTable();
                 applied = true;
-                ChemistryMod.Log?.Log("掉落表接入完成：未知样品 / 化合物 / 化学工具已进入垃圾场掉落");
+                ChemistryMod.Log?.Log("掉落表接入完成：未知样品 / 化合物 / 化学工具已进入垃圾场掉落"
+                    + "（单质直掉已移除，元素改走样品提炼和原料采购）");
             }
             catch (Exception e)
             {
@@ -82,13 +87,18 @@ namespace Chemistry
             ModHelper.AddLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, CompoundTableId, 25f);
         }
 
-        private static void RegisterElementTable()
+        /// <summary>把旧版本留下的单质直掉挂载撤掉（新版本根本不再注册它）。</summary>
+        private static void RemoveLegacyElementTable()
         {
-            var entries = new List<(string itemId, float weight)>();
-            foreach (ElementDef element in ChemistryCatalog.Elements)
-                entries.Add((element.ItemId, element.Number <= 20 ? 4f : element.Number > 92 ? 0.15f : 1.5f));
-            ModHelper.RegisterLootTable(ChemistryCatalog.ModId, ElementTableId, entries.ToArray());
-            ModHelper.AddLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, ElementTableId, 8f);
+            try
+            {
+                ModHelper.RemoveLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, LegacyElementTableId);
+                ModHelper.ClearLootTable(ChemistryCatalog.ModId, LegacyElementTableId);
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("清理旧版单质掉落表失败（不影响游戏）：" + e.Message);
+            }
         }
 
         private static void AddToolsToVanillaTable()
@@ -162,10 +172,10 @@ namespace Chemistry
                 ModHelper.RemoveLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, SampleTableId);
                 ModHelper.RemoveLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundFreshGroup, SampleTableId);
                 ModHelper.RemoveLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, CompoundTableId);
-                ModHelper.RemoveLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, ElementTableId);
+                ModHelper.RemoveLootGroupEntry(ChemistryCatalog.ModId, DumpingGroundGroup, LegacyElementTableId);
                 ModHelper.ClearLootTable(ChemistryCatalog.ModId, SampleTableId);
                 ModHelper.ClearLootTable(ChemistryCatalog.ModId, CompoundTableId);
-                ModHelper.ClearLootTable(ChemistryCatalog.ModId, ElementTableId);
+                ModHelper.ClearLootTable(ChemistryCatalog.ModId, LegacyElementTableId);
             }
             catch (Exception e)
             {
@@ -184,13 +194,14 @@ namespace Chemistry
                 return;
             }
 
-            log.Log("掉落表状态：已接入 = " + applied);
+            log.Log("掉落表状态：已接入 = " + applied + "（单质直掉已移除）");
             ChemistryDebugWindow.Report(applied
-                ? Loc.Pick("化学掉落表已接入。条目明细见游戏日志。", "Chemistry loot tables are active. See the game log for entries.")
+                ? Loc.Pick("化学掉落表已接入，垃圾场不再直掉单质。条目明细见游戏日志。",
+                    "Chemistry loot tables are active; the dumping ground no longer drops raw elements. See the game log for entries.")
                 : Loc.Pick("化学掉落表尚未接入。详情见游戏日志。", "Chemistry loot tables are inactive. See the game log for details."), applied);
             LogTable(log, SampleTableId);
             LogTable(log, CompoundTableId);
-            LogTable(log, ElementTableId);
+            LogTable(log, LegacyElementTableId);
 
             try
             {

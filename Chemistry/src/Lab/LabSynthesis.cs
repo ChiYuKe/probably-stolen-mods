@@ -184,6 +184,16 @@ namespace Chemistry
                 ChemistryMod.Log?.Warning("实验室合成后更新故事进度失败：" + e.Message);
             }
 
+            try
+            {
+                OrderService.OnCompoundProduced(def);
+            }
+            catch (Exception e)
+            {
+                // 委托进度同理，不能影响已经到手的产物
+                ChemistryMod.Log?.Warning("实验室合成后更新委托进度失败：" + e.Message);
+            }
+
             message = Loc.Get("craft_ok", "合成成功：{0}", "Crafted: {0}", SynthesisService.DisplayName(def));
             ChemistryMod.Log?.Log(message + "（实验室储物格）");
             DayHudBridge.Push(Loc.Get("hud_craft_ok", "合成成功：{0}", "Crafted: {0}",

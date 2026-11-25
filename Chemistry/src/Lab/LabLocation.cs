@@ -220,6 +220,15 @@ namespace Chemistry
                 LabInventoryGrid.Open();
                 StoryService.OnLabArrived();
 
+                try
+                {
+                    OrderService.OnLabVisited();
+                }
+                catch (Exception e)
+                {
+                    log?.Warning("刷新委托期限失败：" + e.Message);
+                }
+
                 int visits = 0;
                 try
                 {

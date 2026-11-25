@@ -247,6 +247,16 @@ namespace Chemistry
             {
                 // 不在实验室/储物格不可用时忽略
             }
+
+            // 委托里「看过成分报告」那一步
+            try
+            {
+                OrderService.OnSampleAnalyzed(sample);
+            }
+            catch (Exception e)
+            {
+                ChemUi.Log?.Warning("更新委托检测进度失败：" + e.Message);
+            }
         }
 
         private static void PlayScanEffect(SampleDef sample, bool already)

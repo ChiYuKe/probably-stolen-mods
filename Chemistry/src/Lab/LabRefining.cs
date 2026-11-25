@@ -188,6 +188,20 @@ namespace Chemistry
                 string name = output?.Name ?? SampleTable.ElementName(ChemistryCatalog.FindElementByItemId(outputId).Symbol);
                 string message = Loc.Get("refining_stage_done", "产物格已生成 {0} ×1", "Output ready: {0} x1", name);
                 Notify(station, message, true, outputId);
+
+                // 还原槽出单质：这是委托里「亲手回收」那一步
+                ElementDef produced = ChemistryCatalog.FindElementByItemId(outputId);
+                if (produced != null)
+                {
+                    try
+                    {
+                        OrderService.OnElementRecovered(produced.Symbol);
+                    }
+                    catch (Exception e)
+                    {
+                        ChemUi.Log?.Warning("更新委托回收进度失败：" + e.Message);
+                    }
+                }
             });
         }
 
@@ -252,6 +266,8 @@ namespace Chemistry
                 return StorageError();
             }
 
+            NotifyRecovered(element);
+
             return Loc.Get("lab_samples_refined", "提炼完成，{0} ×1 已存入储物格。", "Refined {0} x1 and placed it in lab storage.",
                 SampleTable.ElementName(symbol));
         }
@@ -287,6 +303,7 @@ namespace Chemistry
                     return StorageError();
                 }
 
+                NotifyRecovered(element);
                 return Loc.Get("lab_samples_refined", "提炼完成，{0} ×1 已存入储物格。",
                     "Refined {0} x1 and placed it in lab storage.", SampleTable.ElementName(symbol));
             }
@@ -303,13 +320,53 @@ namespace Chemistry
                 inStore = 0;
             }
 
-            if (inStore < needed)
+            int fromLab = Math.Min(inLab, needed);
+            int fromStore = needed - fromLab;
+            if (inStore < fromStore)
             {
                 int have = inLab + inStore;
                 return Loc.Get("lab_samples_missing_anywhere",
                     "样品不够：提炼 {0} 需要 {1} 份已检测样品（实验室 {2} + 店里 {3}）。",
                     "Not enough samples: refining {0} needs {1} analyzed samples (lab {2} + store {3}).",
                     SampleTable.ElementName(symbol), needed, inLab, inStore);
+            }
+
+            // Samples can be split between lab storage and the shop. Convert the lab
+            // portion first so the result has a guaranteed destination, then consume
+            // the remaining shop stock. If that second step fails, reverse the lab swap.
+            if (fromLab > 0)
+            {
+                if (!LabStorage.TryExchange(sample.DetectedId, fromLab, element.ItemId, 1))
+                {
+                    return StorageError();
+                }
+
+                bool consumed;
+                try
+                {
+                    consumed = StoreInventory.TryConsume(sample.DetectedId, fromStore);
+                }
+                catch (Exception e)
+                {
+                    ChemUi.Log?.Warning("扣除当铺样品失败：" + e.Message);
+                    consumed = false;
+                }
+
+                if (!consumed)
+                {
+                    if (!LabStorage.TryExchange(element.ItemId, 1, sample.DetectedId, fromLab))
+                    {
+                        ChemUi.Log?.Error("提炼失败后无法恢复实验室样品：" + sample.DetectedId);
+                    }
+                    return Loc.Get("lab_samples_consume_failed", "扣除样品失败，提炼取消。", "Could not consume the samples; refining cancelled.");
+                }
+
+                ChemUi.InvalidateCounts();
+                NotifyRecovered(element);
+                return Loc.Get("lab_samples_refined_mixed",
+                    "提炼完成，{0} ×1 已存入实验室（实验室 {1} + 当铺 {2} 份样品）。",
+                    "Refined {0} x1 into lab storage (lab {1} + store {2} analyzed samples).",
+                    SampleTable.ElementName(symbol), fromLab, fromStore);
             }
 
             GameItem product = null;
@@ -354,8 +411,27 @@ namespace Chemistry
             }
 
             ChemUi.InvalidateCounts();
+            NotifyRecovered(element);
             return Loc.Get("lab_samples_refined_store", "提炼完成，{0} ×1 已放进店里仓库。",
                 "Refined {0} x1 and placed it in the store storage.", SampleTable.ElementName(symbol));
+        }
+
+        /// <summary>提炼出单质后推进委托进度（「亲手回收」那一步）。</summary>
+        private static void NotifyRecovered(ElementDef element)
+        {
+            if (element == null)
+            {
+                return;
+            }
+
+            try
+            {
+                OrderService.OnElementRecovered(element.Symbol);
+            }
+            catch (Exception e)
+            {
+                ChemUi.Log?.Warning("更新委托回收进度失败：" + e.Message);
+            }
         }
 
         private static string StorageError()

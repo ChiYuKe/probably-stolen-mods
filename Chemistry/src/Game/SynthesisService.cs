@@ -200,6 +200,17 @@ namespace Chemistry
             message = Loc.Get("craft_ok", "合成成功：{0}", "Crafted: {0}", DisplayName(def));
             ChemistryMod.Log?.Log(message + "（消耗 " + DescribeConsumed(consumed) + "）");
             DayHudBridge.Push(Loc.Get("hud_craft_ok", "合成成功：{0}", "Crafted: {0}", DisplayName(def)), "info", 6f);
+
+            try
+            {
+                OrderService.OnCompoundProduced(def);
+            }
+            catch (Exception e)
+            {
+                // 委托进度出问题不能影响已经到手的产物
+                ChemistryMod.Log?.Warning("合成后更新委托进度失败：" + e.Message);
+            }
+
             return true;
         }
 
