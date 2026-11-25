@@ -356,3 +356,58 @@ python tools/verify.py --skip-build  -> PASS 134 / FAIL 3
   行内「需要/已有」按化学式逐元素显示，储物格联动合成逻辑未变。
 
 截图：`docs/screenshots/synthesis-550.png`、`compendium-550.png`、`lab-bench-550.png`、`synthesis-craft.png`。
+
+---
+
+# 委托线落地（2026-11-26）
+
+按 `docs/GAMEPLAY_ROADMAP.md` 实施 M1–M4。契约见 `data/ORDER_CONTRACT.md`。
+
+## 编译
+
+```
+dotnet build ProbablyStolenMods.sln -c Release -p:DeployToMods=false
+-> 已成功生成。0 个警告，0 个错误
+```
+
+## 静态验收（`Chemistry/bin/order-check/harness`，本地工程，不进仓库）
+
+```
+dotnet run -c Release
+-> PASS: 5 order templates, 118 element channels, accept/settle/rollback/borrow/purchase/expiry all behave.
+```
+
+覆盖的断言：
+
+| 断言 | 说明 |
+| --- | --- |
+| 模板完整性 | 5 张委托 id 唯一、中英标题/简述齐全、报酬 > 0、有交付要求和 `deliver` 步骤、交付物能反查到名字 |
+| 前置关系 | `RequiresOrder` 指向真实存在的模板；`RequiresChapter` / `RequiresDay` 生效 |
+| 元素渠道 | 118 种元素每种至少一条渠道；每种都有采购渠道；**所有 550 条配方的上游元素都能拿到**（撤掉单质直掉后不会出现死配方） |
+| 接单 | 前置未完成时接不了；进行中不能再接；编号从 1 递增 |
+| 教学步骤 | 没做完全部教学步骤时 `CanSettle` 为假；步骤允许乱序完成 |
+| 存档往返 | `EnsureLoaded` 之后进行中的委托、编号、已完成步骤都还在 |
+| 结算 | 扣一份铁、发一次钱；`Active` 清空；写入结算记录 |
+| 重复交付 | 第二次 `Settle` 返回 false 且不再发钱 |
+| 交付失败回滚 | `TryConsume` 失败时不发钱、订单保持可重试 |
+| 借用工位 | 空仓库时 `Audit` 有缺口；领一次后 `CanBorrow` 变假、第二次 `Borrow` 失败 |
+| 采购 | 结清首单后解锁；钱够时按价扣款并发货；钱不够时不发货 |
+| 期限 | `ResetForDebug` 清空进行中/历史/编号/信用点 |
+
+## 源码级检查
+
+- `LootIntegration` 里 `RegisterLootTable` / `AddLootGroupEntry` 只剩样品表和化合物表，
+  没有单质表；旧的 `chemElementTable` 只在 `RemoveLegacyElementTable()` 里被清理，不再注册。
+- 元素物品提示新增「来源」一行，内容来自 `ElementSources.Describe`。
+- F9 新增三个入口：「化学：委托记录」「化学：元素渠道盘点」「化学：重置委托」。
+
+## 待实机确认
+
+以下需要进游戏点一遍（本地没有游戏进程，只做到静态验收）：
+
+1. 新档关闭开局补给 → 接老锈试单 → 领借用工位 → 扫批次 01 或普通废金属 → 制盐酸 →
+   酸浸/过滤/还原出铁 → 回店交付 → 信用点到账、订单进「已结算」。
+2. 交付按钮重复点击、仓库满、余额不足、错误物品四种情况都不吞料、不双倍发钱。
+3. 加工中读档、交付前后读档，委托进度按该档恢复。
+4. 委托页在 F6 实验台 / 地下实验室面板 / F9 独立窗口三处都能打开并刷新。
+5. 接单/收货 NPC 每天最多来一次，错过之后仍能从委托页接单。
