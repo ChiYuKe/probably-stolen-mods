@@ -268,7 +268,7 @@ namespace Chemistry
                 ChemUi.Fit(name, 26),
                 string.IsNullOrEmpty(def.Formula) ? "?" : def.Formula,
                 ChemistryCatalog.CompoundCategoryLabel(def.Category, Loc.IsChinese),
-                def.Value);
+                ItemPricing.CompoundDisplayValue(def));
 
             builder.AddButton(label, delegate { ShowDetail(def); }, null);
             CustomUIElement button = builder.Last;
@@ -373,7 +373,7 @@ namespace Chemistry
                 "{0}　·　价值 {1}　·　拥有 {2}",
                 "{0}　·　value {1}　·　owned {2}",
                 ChemistryCatalog.CompoundCategoryLabel(def.Category, Loc.IsChinese),
-                def.Value,
+                ItemPricing.CompoundDisplayValue(def),
                 ChemUi.CountOf(def.ItemId)));
 
             var builder = new StringBuilder();

@@ -158,12 +158,12 @@ namespace Chemistry
             string text = "<b>" + symbol + "　" + nameZh + " / " + nameEn + "</b>\n"
                 + Loc.Get(
                     "pt_detail_line",
-                    "序数 {0}　·　分类：{1}　·　相对原子质量 {2}　·　价值 {3}　·　拥有 {4}",
-                    "Number {0}　·　Category: {1}　·　Atomic mass {2}　·　Value {3}　·　Owned {4}",
+                    "序数 {0}　·　分类：{1}　·　相对原子质量 {2}　·　价值/克 {3}　·　拥有 {4}",
+                    "Number {0}　·　Category: {1}　·　Atomic mass {2}　·　Value/g {3}　·　Owned {4}",
                     def.Number,
                     category,
                     ChemUi.MassText(def.Mass),
-                    def.Value,
+                    ItemPricing.ElementUnitValue(def),
                     ChemUi.CountOf(def.ItemId));
 
             SetDetail(text);

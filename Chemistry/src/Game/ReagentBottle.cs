@@ -539,6 +539,7 @@ namespace Chemistry
             item.SetShape(old.shape);
             item.modifiedShape = old.modifiedShape.Clone();
             item.SetUnitCount(amount);
+            ItemPricing.Sync(item);
             return item;
         }
 

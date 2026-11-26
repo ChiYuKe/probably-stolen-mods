@@ -27,7 +27,7 @@
 | `display_form` | `metal_powder / granules / liquid_bottle / gas_vial / sealed_specimen / archive_record`。 |
 | `handling` | `standard` 走标准槽位，`controlled` 需要匹配的封装槽，`restricted` 只允许对应路线的封闭机台或接收槽，`research` 只在研究委托或档案内处理。这一列控制游戏交互权限。 |
 | `trade_policy` | `market` 可按正常物品流程交易，`contract_only` 通过一次性委托结算，`catalog_only` 只登记研究记录。 |
-| `catalog_value` | 当前 `ElementDef.Value`，单位为信用点/件。常规单质上线首版沿用；委托另设奖励，档案解锁发图鉴进度。 |
+| `catalog_value` | `ElementDef.Value` 的目录参考值。库存统一按 1 g/单位，实际单价按参考值除以相对原子质量并取整，至少为 1；采购加价另行计算。 |
 | `item_id`、`sprite_key` | 现有存档键和美术键。档案条目的物品 ID 用于识别旧库存及目录项，新解锁直接登记元素符号。 |
 
 ### 阶段与机器

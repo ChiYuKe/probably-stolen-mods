@@ -244,7 +244,7 @@ namespace Chemistry
                 .Append("　·　")
                 .Append(ChemistryCatalog.CompoundCategoryLabel(def.Category, Loc.IsChinese))
                 .Append("　·　")
-                .Append(Loc.Get("syn_value", "价值 {0}", "Value {0}", def.Value));
+                .Append(Loc.Get("syn_value", "价值 {0}", "Value {0}", ItemPricing.CompoundDisplayValue(def)));
 
             if (def.Key == NitricProductionData.Key)
             {

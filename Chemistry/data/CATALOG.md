@@ -98,7 +98,7 @@ phase,melt_c,boil_c,density,density_unit,electronegativity,electron_config,block
   `alkali_metal` `alkaline_earth` `transition_metal` `post_transition` `metalloid`
   `nonmetal` `halogen` `noble_gas` `lanthanide` `actinide`。
 - `mass`：相对原子质量，小数用 `.`。
-- `value`：基础价值（信用点，整数）。参考区间：常见轻元素 3~15（H/O/C/N/S/Na/Cl/Ca/Mg/Al/Si），
+- `value`：目录参考价值（信用点，整数）。游戏内元素按统一的 1 g 单位折算售价，堆叠总价受单格质量和 350 信用点上限约束。参考区间：常见轻元素 3~15（H/O/C/N/S/Na/Cl/Ca/Mg/Al/Si），
   普通金属 12~40（Fe/Cu/Zn/Pb/Sn…），贵金属 120~220（Au/Ag/Pt/Pd/Rh），
   稀有/放射性 40~260（稀有气体 30~90，U/Pu 200+，Tc/Pm 稀有 180+）。
 - `group`：周期表列 1..18；镧系（57~71）和锕系（89~103）填 `0`，界面会把它们单列两行。
@@ -120,7 +120,7 @@ beaker,烧杯,Beaker,glassware,60,最基础的玻璃器皿。,The most basic gla
 
 - `key`：小写英文+下划线，唯一，**必须用第 4 节锁定表里的 key 和顺序**。
 - `category`：`glassware` `heating` `measurement` `separation` `safety` `misc`。
-- `value`：基础价值，参考锁定表给的区间。
+- `value`：目录参考价值，运行时作为单件或标准瓶售价的基准；堆叠和整瓶总价限制在 350 信用点内。
 - 描述写法：一两句话，说明它在这个模组里干什么用（会被合成配方引用）。
 
 ### 3.3 `data/compounds.csv`
@@ -187,8 +187,8 @@ water,H2O,水,Water,other,12,beaker|bunsen_burner,两个氢一个氧，最普通
 | 17 | balance | 分析天平 | Analytical balance | measurement | 180 |
 | 18 | thermometer | 温度计 | Thermometer | measurement | 50 |
 | 19 | ph_meter | pH计 | pH meter | measurement | 150 |
-| 20 | spectrometer | 光谱仪 | Spectrometer | measurement | 420 |
-| 21 | chromatograph | 色谱仪 | Chromatograph | measurement | 380 |
+| 20 | spectrometer | 光谱仪 | Spectrometer | measurement | 350 |
+| 21 | chromatograph | 色谱仪 | Chromatograph | measurement | 330 |
 | 22 | centrifuge | 离心机 | Centrifuge | separation | 300 |
 | 23 | distiller | 蒸馏器 | Distiller | separation | 260 |
 | 24 | separating_funnel | 分液漏斗 | Separating funnel | separation | 85 |

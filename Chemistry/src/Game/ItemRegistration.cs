@@ -229,7 +229,7 @@ namespace Chemistry
                     "Place in lab storage and double-click. Fit machines and a transport manifold to run the line.")
                 : Loc.Pick("装入自动化厂房的管路槽，连接预处理和回收工位。",
                     "Fit to the workshop transport bay to connect its two stages.");
-            item.unitBaseValue = item.unitValue = workshop ? 360 : 90;
+            item.unitBaseValue = item.unitValue = workshop ? 350 : 90;
             item.unitCount = 1;
             item.mayStackItemFunc = (_, _) => false;
             ApplyCommon(item, workshop ? IndustrialFactoryData.FrameSprite : "machine_industrial_line_kit", "TOOL");
@@ -246,7 +246,8 @@ namespace Chemistry
             if (sample.Units > 0) item.shortDescription = sample.Contents + "\n" + item.shortDescription;
             item.unitBaseValue = item.unitValue = 5;
             item.unitCount = 1;
-            item.maxSlotAmountItemFunc = (_, _, _) => LabStorage.MaxCountPerSlot;
+            item.maxSlotAmountItemFunc = (_, _, _) => ReagentBottle.IsLiquid(id) || ReagentBottle.IsGas(id)
+                ? LabStorage.MaxCountPerSlot : ItemPricing.StackLimitFor(item);
             string sprite = ReagentBottle.IsLiquid(id) ? MaterialItemArt.Apply(item, id.Substring(ChemistryCatalog.ItemPrefix.Length))
                 : MaterialItemArt.AttachMixture(item);
             ApplyCommon(item, sprite, "CHEMICAL_SUPPLIES");
@@ -261,7 +262,8 @@ namespace Chemistry
             item.unitBaseValue = item.unitValue = id == LabAnalysisData.Spent ? 1 : 5;
             item.unitCount = id == LabAnalysisData.Dye || id == LabAnalysisData.Acid || id == LabAnalysisData.Titrant
                 ? LabMixtureData.Portion : 1;
-            item.maxSlotAmountItemFunc = (_, _, _) => LabStorage.MaxCountPerSlot;
+            item.maxSlotAmountItemFunc = (_, _, _) => ReagentBottle.IsLiquid(id) || ReagentBottle.IsGas(id)
+                ? LabStorage.MaxCountPerSlot : ItemPricing.StackLimitFor(item);
             string sprite = id == LabAnalysisData.Carbon ? "el_c"
                 : id == LabAnalysisData.Spent ? "sample_slag"
                 : MaterialItemArt.Apply(item, id.Substring(ChemistryCatalog.ItemPrefix.Length));
@@ -276,7 +278,8 @@ namespace Chemistry
             item.shortDescription = LabMixtureData.Description(id);
             item.unitBaseValue = item.unitValue = id == LabMixtureData.Oil ? 4 : 12;
             item.unitCount = id == LabMixtureData.Oil ? LabMixtureData.Portion : 1;
-            item.maxSlotAmountItemFunc = (_, _, _) => LabStorage.MaxCountPerSlot;
+            item.maxSlotAmountItemFunc = (_, _, _) => ReagentBottle.IsLiquid(id) || ReagentBottle.IsGas(id)
+                ? LabStorage.MaxCountPerSlot : ItemPricing.StackLimitFor(item);
             if (LabMixtureData.IsDirectBatch(id))
             {
                 item.mayStackItemFunc = (_, _) => false;
@@ -453,9 +456,10 @@ namespace Chemistry
             item.name = Loc.Pick(def.NameZh, def.NameEn) + " (" + symbol + ")";
             item.identifierName = symbol;
             item.unitBaseValue = def.Value;
-            item.unitValue = def.Value;
+            item.unitValue = ItemPricing.ElementUnitValue(def);
             item.unitCount = 1;
-            item.maxSlotAmountItemFunc = (_, _, _) => ItemMass.MaxStack(ItemMass.ElementUnitGrams);
+            int maxStack = ItemMass.MaxStack(ItemMass.ElementUnitGrams, ItemPricing.ElementUnitValue(def));
+            item.maxSlotAmountItemFunc = (_, _, _) => maxStack;
 
             string category = ChemistryCatalog.ElementCategoryLabel(def.Category, Loc.IsChinese);
             item.longDescription = BuildElementDescription(def, category);
@@ -603,12 +607,13 @@ namespace Chemistry
             item.name = Loc.Pick(def.NameZh, def.NameEn);
             item.identifierName = def.Key;
             item.unitBaseValue = def.Value;
-            item.unitValue = def.Value;
+            item.unitValue = ItemPricing.ToolUnitValue(def);
             item.unitCount = 1;
             // 光谱仪/蒸馏器要在店里、实验室里都能拖到样品上使用
             item.canUseOutsideCombat = true;
             // 工具也按质量限叠：烧杯 3 件/格，天平、光谱仪这类重设备每格 1 件。
-            item.maxSlotAmountItemFunc = (_, _, _) => ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId));
+            int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId), ItemPricing.ToolUnitValue(def));
+            item.maxSlotAmountItemFunc = (_, _, _) => maxStack;
 
             item.shortDescription = Loc.Get(
                 "item_tool_short",
@@ -663,12 +668,12 @@ namespace Chemistry
             item.name = Loc.Pick(def.NameZh, def.NameEn) + " " + formula;
             item.identifierName = def.Key;
             item.unitBaseValue = def.Value;
-            item.unitValue = def.Value;
+            item.unitValue = ItemPricing.CompoundItemValue(def);
             item.unitCount = 1;
             // 固体化合物（1 件 = 1 mol）按式量折算堆叠上限；液体/气体是容器，仍按容量合并。
             if (!ReagentBottle.IsLiquid(def.ItemId) && !ReagentBottle.IsGas(def.ItemId))
             {
-                int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId));
+                int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId), ItemPricing.CompoundItemValue(def));
                 item.maxSlotAmountItemFunc = (_, _, _) => maxStack;
                 item.mayStackItemFunc = (first, second) => first.identifier == second.identifier
                     && GeneralHelper.IsItemOwned(first) == GeneralHelper.IsItemOwned(second);
@@ -746,7 +751,7 @@ namespace Chemistry
         private static void EnableSupplyStacking(GameItem item)
         {
             // 同类型可叠，但每格总质量不超过 ItemMass.StackLimitGrams。
-            int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(item.identifier));
+            int maxStack = ItemPricing.StackLimitFor(item);
             item.maxSlotAmountItemFunc = (_, _, _) => maxStack;
             item.mayStackItemFunc = (first, second) => first.identifier == second.identifier
                 && GeneralHelper.IsItemOwned(first) == GeneralHelper.IsItemOwned(second);
@@ -778,6 +783,9 @@ namespace Chemistry
             {
                 ChemistryMod.Log?.Warning("贴图设置失败：" + spriteKey + " " + e.Message);
             }
+
+            // 价格按单位数量校准，瓶装液体再按当前容量分摊。
+            ItemPricing.Attach(item);
 
             // 克数写进游戏称重系统（WEIGHT_TAG），店里电子秤才能称出真实重量；
             // 只对 chem_ 前缀的模组物品生效，原版物品不经这里。
@@ -861,6 +869,7 @@ namespace Chemistry
             {
                 item.SetShape(footprint.SetTransform(item.modifiedShape));
             }
+            ItemPricing.Sync(item);
         }
 
         internal static bool TryUseCompactContainerFootprint(GameItem item)
@@ -905,6 +914,7 @@ namespace Chemistry
                 bool sameCells = HasSameCells(saved, footprint);
                 if (sameCells && sprite == item.spritePath)
                 {
+                    ItemPricing.Sync(item);
                     continue;
                 }
 
@@ -922,6 +932,7 @@ namespace Chemistry
                 {
                     blocked++;
                 }
+                ItemPricing.Sync(item);
             }
             if (blocked > 0)
             {

@@ -52,9 +52,9 @@ namespace Chemistry
             new ToolDef { Key = "conductivity_meter", NameZh = "电导率仪", NameEn = "Conductivity meter", Category = "measurement", Value = 210, DescZh = "探头接入台式读数仪。", DescEn = "A benchtop meter with a wired probe." },
             new ToolDef { Key = "ultrasonic_cleaner", NameZh = "超声波清洗机", NameEn = "Ultrasonic cleaner", Category = "misc", Value = 240, DescZh = "不锈钢清洗槽，适合小型器皿。", DescEn = "A stainless bath for small glassware." },
             new ToolDef { Key = "drying_oven", NameZh = "实验室干燥箱", NameEn = "Drying oven", Category = "heating", Value = 275, DescZh = "有观察窗和多层托盘的干燥箱。", DescEn = "A drying chamber with a viewing window and stacked trays." },
-            new ToolDef { Key = "rotary_evaporator", NameZh = "旋转蒸发仪", NameEn = "Rotary evaporator", Category = "separation", Value = 450, DescZh = "旋转烧瓶旁装有冷凝回收组件。", DescEn = "A rotating flask with a condenser and collection assembly." },
-            new ToolDef { Key = "freeze_dryer", NameZh = "冷冻干燥机", NameEn = "Freeze dryer", Category = "separation", Value = 515, DescZh = "真空干燥舱配有独立冷阱。", DescEn = "A vacuum drying chamber with a separate cold trap." },
-            new ToolDef { Key = "glovebox", NameZh = "密闭手套箱", NameEn = "Glovebox", Category = "safety", Value = 540, DescZh = "密封观察窗下有一对手套口。", DescEn = "A sealed viewing chamber with two glove ports." },
+            new ToolDef { Key = "rotary_evaporator", NameZh = "旋转蒸发仪", NameEn = "Rotary evaporator", Category = "separation", Value = 300, DescZh = "旋转烧瓶旁装有冷凝回收组件。", DescEn = "A rotating flask with a condenser and collection assembly." },
+            new ToolDef { Key = "freeze_dryer", NameZh = "冷冻干燥机", NameEn = "Freeze dryer", Category = "separation", Value = 330, DescZh = "真空干燥舱配有独立冷阱。", DescEn = "A vacuum drying chamber with a separate cold trap." },
+            new ToolDef { Key = "glovebox", NameZh = "密闭手套箱", NameEn = "Glovebox", Category = "safety", Value = 350, DescZh = "密封观察窗下有一对手套口。", DescEn = "A sealed viewing chamber with two glove ports." },
         };
 
         internal static readonly LabEquipmentDef[] All =

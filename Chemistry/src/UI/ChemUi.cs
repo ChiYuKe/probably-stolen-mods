@@ -403,7 +403,7 @@ namespace Chemistry
             builder.Append(" (").Append(string.IsNullOrEmpty(def.Formula) ? "?" : def.Formula).Append(")\n");
             builder.Append(ChemistryCatalog.CompoundCategoryLabel(def.Category, Loc.IsChinese));
             builder.Append("  ·  ");
-            builder.Append(Loc.Get("tooltip_value", "价值 {0}", "Value {0}", def.Value));
+            builder.Append(Loc.Get("tooltip_value", "价值 {0}", "Value {0}", ItemPricing.CompoundDisplayValue(def)));
             string desc = Loc.Pick(def.DescZh, def.DescEn);
             if (!string.IsNullOrEmpty(desc))
             {

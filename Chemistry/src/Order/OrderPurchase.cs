@@ -15,7 +15,7 @@ namespace Chemistry
     /// </summary>
     internal static class OrderPurchase
     {
-        /// <summary>加价倍数：采购价 = 元素价值 × 这个数（再夹到下限）。</summary>
+        /// <summary>加价倍数：采购价按一个库存质量单位的售价计算。</summary>
         private const int Markup = 4;
 
         /// <summary>单次采购的最少花费，别让常见元素白送。</summary>
@@ -91,7 +91,7 @@ namespace Chemistry
                 return MinPrice;
             }
 
-            return Math.Max(MinPrice, Math.Max(0, element.Value) * Markup);
+            return Math.Max(MinPrice, ItemPricing.ElementUnitValue(element) * Markup);
         }
 
         public static int PriceOf(string itemId, int count)

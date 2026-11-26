@@ -566,7 +566,7 @@ namespace Chemistry
                 .Append("　·　")
                 .Append(ChemistryCatalog.CompoundCategoryLabel(def != null ? def.Category : "", Loc.IsChinese))
                 .Append("　·　")
-                .Append(Loc.Get("lab_value", "价值 {0}", "Value {0}", def != null ? def.Value : 0));
+                .Append(Loc.Get("lab_value", "价值 {0}", "Value {0}", ItemPricing.CompoundDisplayValue(def)));
 
             if (def?.Key == NitricProductionData.Key)
             {

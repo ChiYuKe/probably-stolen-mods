@@ -60,6 +60,19 @@ namespace Chemistry
             return Math.Min(LabStorage.MaxCountPerSlot, Math.Max(1, byMass));
         }
 
+        /// <summary>Limits a stack by both the mass budget and the sale value budget.</summary>
+        public static int MaxStack(int unitGrams, int unitValue)
+        {
+            int byMass = MaxStack(unitGrams);
+            if (unitValue <= 0)
+            {
+                return byMass;
+            }
+
+            int byValue = Math.Max(1, ItemPricing.MaxSingleSaleValue / unitValue);
+            return Math.Min(byMass, byValue);
+        }
+
         /// <summary>Mass tooltip for the current integer count.</summary>
         public static string TooltipLine(GameItem item)
         {
