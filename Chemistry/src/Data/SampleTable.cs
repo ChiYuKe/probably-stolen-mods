@@ -47,10 +47,10 @@ namespace Chemistry
         }
 
         /// <summary>按质量分数折算某成分的单件质量（克）；占比只用于展示，不参与提炼结算。</summary>
-        public double ComponentGrams(string symbol)
+        public int ComponentGrams(string symbol)
         {
             int percent = Array.Find(Components, c => c.Symbol == symbol).Percent;
-            return Grams * percent / 100.0;
+            return (int)(((long)Grams * percent + 50) / 100);
         }
 
         public string MassLine()

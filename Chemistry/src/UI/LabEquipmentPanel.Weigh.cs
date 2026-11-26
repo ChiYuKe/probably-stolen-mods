@@ -14,8 +14,7 @@ namespace Chemistry
             string id = item?.identifier;
             if (string.IsNullOrEmpty(id)) return Failed;
             var lines = new List<string>();
-            if (ChemistryCatalog.FindElementByItemId(id) == null
-                && (ReagentBottle.IsLiquid(id) || ReagentBottle.IsGas(id)))
+            if (ReagentBottle.IsLiquid(id) || ReagentBottle.IsGas(id))
             {
                 AddBottleReading(item, id, lines);
             }
@@ -32,10 +31,10 @@ namespace Chemistry
             return string.Join("\n", lines);
         }
 
-        /// <summary>固体/元素/样品：单件质量 × 件数，叠放超过 999 时说明是质量限制了堆叠。</summary>
+        /// <summary>Solid items, elements, and samples use integer mass units and counts.</summary>
         private static void AddMassReading(GameItem item, string id, List<string> lines)
         {
-            double unit = ItemMass.UnitMass(id);
+            int unit = ItemMass.UnitMass(id);
             if (unit <= 0)
             {
                 lines.Add(Loc.Pick($"库存读数：{item.unitCount} 单位 · 未登记质量",
@@ -44,10 +43,15 @@ namespace Chemistry
             }
 
             int count = item.unitCount;
-            lines.Add(count > 1
-                ? Loc.Pick($"{count} 件 · 每件 {ItemMass.Format(unit)} · 共 {ItemMass.Format(unit * count)}",
-                    $"{count} pcs · {ItemMass.Format(unit)} each · {ItemMass.Format(unit * count)} total")
-                : Loc.Pick($"读数 {ItemMass.Format(unit)}", $"Reading {ItemMass.Format(unit)}"));
+            long total = (long)unit * count;
+            ElementDef element = ChemistryCatalog.FindElementByItemId(id);
+            lines.Add(element != null
+                ? Loc.Pick($"{count} 单位 · 每单位 {ItemMass.Format(unit)} · 共 {ItemMass.Format(total)}",
+                    $"{count} units · {ItemMass.Format(unit)} each · {ItemMass.Format(total)} total")
+                : count > 1
+                    ? Loc.Pick($"{count} 件 · 每件 {ItemMass.Format(unit)} · 共 {ItemMass.Format(total)}",
+                        $"{count} pcs · {ItemMass.Format(unit)} each · {ItemMass.Format(total)} total")
+                    : Loc.Pick($"读数 {ItemMass.Format(unit)}", $"Reading {ItemMass.Format(unit)}"));
             int maxStack = ItemMass.MaxStack(unit);
             if (maxStack < LabStorage.MaxCountPerSlot)
             {
@@ -66,7 +70,7 @@ namespace Chemistry
             var parts = new List<string>();
             foreach (var component in sample.Components)
             {
-                parts.Add(component.Symbol + " " + Loc.Pick("约 ", "~ ") + ItemMass.Format(sample.ComponentGrams(component.Symbol) * count));
+                parts.Add(component.Symbol + " " + Loc.Pick("约 ", "~ ") + ItemMass.Format((long)sample.ComponentGrams(component.Symbol) * count));
             }
             return Loc.Pick("含 ", "Contains ") + string.Join(Loc.Pick("、", ", "), parts);
         }
@@ -77,12 +81,15 @@ namespace Chemistry
         /// <summary>瓶装试剂：实装质量加空瓶皮重；空瓶只报皮重。</summary>
         private static void AddBottleReading(GameItem item, string id, List<string> lines)
         {
-            double contents = ItemMass.ContentGrams(id, item.unitCount);
+            int units = ReagentBottle.Contents(item);
+            long contents = ItemMass.ContentGrams(id, units);
             string emptyId = ReagentBottle.ReturnedEmpty(item);
-            double tare = string.IsNullOrEmpty(emptyId) ? 0 : ItemMass.UnitMass(emptyId);
+            int tare = string.IsNullOrEmpty(emptyId) ? 0 : ItemMass.UnitMass(emptyId);
             if (contents > 0)
             {
-                string line = Loc.Pick($"实装 {ItemMass.Format(contents)}", $"Contents {ItemMass.Format(contents)}");
+                long milliliters = (long)units * ReagentBottle.MillilitersPerUnit;
+                string amount = Loc.Pick($"{units} 单位 / {milliliters} mL", $"{units} units / {milliliters} mL");
+                string line = Loc.Pick($"实装 {amount} · {ItemMass.Format(contents)}", $"Contents {amount} · {ItemMass.Format(contents)}");
                 if (tare > 0)
                 {
                     line += Loc.Pick($" · 皮重 {ItemMass.Format(tare)}", $" · tare {ItemMass.Format(tare)}");

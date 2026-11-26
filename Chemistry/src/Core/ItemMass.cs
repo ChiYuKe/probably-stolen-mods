@@ -1,28 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Chemistry
 {
     /// <summary>
-    /// 统一的单件质量（克）解析、「同类型最多叠 200 克」的堆叠上限，
-    /// 以及把克数写进游戏自带称重系统（WEIGHT_TAG）的同步逻辑。
-    ///
-    /// 质量来源（按顺序）：
-    ///   · 样品：SampleTable 里的实测克数；
-    ///   · 元素：摩尔质量（1 件 = 1 mol）；
-    ///   · 化合物：按化学式折算的式量；
-    ///   · 中间产物、器皿、工具、设备：杂项表固定值；
-    ///   · 液体/气体试剂：瓶内实装质量按 25 mL/单位 × 密度折算，见 <see cref="ContentGrams"/>。
-    ///
-    /// 返回 0 表示该物品没有登记质量：提示框不显示质量行，堆叠也不套 200 克上限，也不写称重标签。
-    /// 液体瓶罐是容器（按容量合并），不套质量上限，只显示实装质量。
+    /// Integer gram accounting for Chemistry items, stack limits, and the game's weight tag.
+    /// Element inventory units use one common mass. Atomic weights remain scientific reference
+    /// data for the periodic table and compound formulas.
     /// </summary>
     internal static class ItemMass
     {
-        public const double StackLimitGrams = 200;
+        public const int ElementUnitGrams = 1;
+        public const int StackLimitGrams = 200;
 
-        /// <summary>单件质量（克）；0 = 未登记。</summary>
-        public static double UnitMass(string itemId)
+        /// <summary>Mass of one inventory unit in whole grams; zero means unregistered.</summary>
+        public static int UnitMass(string itemId)
         {
             if (string.IsNullOrEmpty(itemId))
             {
@@ -35,51 +28,39 @@ namespace Chemistry
                 return sample.Grams;
             }
 
-            ElementDef element = ChemistryCatalog.FindElementByItemId(itemId);
-            if (element != null)
+            if (ChemistryCatalog.FindElementByItemId(itemId) != null)
             {
-                return element.Mass;
+                return ElementUnitGrams;
+            }
+
+            // Fluid item counts are integer container units, so calculate the mass of one such unit.
+            if (ReagentBottle.IsLiquid(itemId) || ReagentBottle.IsGas(itemId))
+            {
+                return FluidUnitGrams(itemId);
             }
 
             CompoundDef compound = FindCompoundByItemId(itemId);
             if (compound != null)
             {
-                return MolarMass(compound);
+                return WholeGrams(MolarMass(compound));
             }
 
-            double fixedGrams = FixedGrams(itemId);
-            if (fixedGrams > 0)
-            {
-                return fixedGrams;
-            }
-
-            // 液体/气体试剂按每单位 25 mL 折算成实装质量。
-            if (ReagentBottle.IsLiquid(itemId))
-            {
-                return ReagentBottle.MillilitersPerUnit * LiquidDensity(itemId);
-            }
-            if (ReagentBottle.IsGas(itemId))
-            {
-                return MolarMassOf(itemId) / 22414d * ReagentBottle.MillilitersPerUnit;
-            }
-
-            return 0;
+            return FixedGrams(itemId);
         }
 
-        /// <summary>200 克上限换算成每格件数；未登记的沿用原来的大堆叠。</summary>
-        public static int MaxStack(double unitGrams)
+        /// <summary>200 gram slot limit converted to an integer item count.</summary>
+        public static int MaxStack(int unitGrams)
         {
             if (unitGrams <= 0)
             {
                 return LabStorage.MaxCountPerSlot;
             }
 
-            int byMass = (int)(StackLimitGrams / unitGrams);
+            int byMass = StackLimitGrams / unitGrams;
             return Math.Min(LabStorage.MaxCountPerSlot, Math.Max(1, byMass));
         }
 
-        /// <summary>提示框质量行：只显示当前物品的真实总质量（单件质量 × 件数），不按件拆分。
-        /// 瓶装液体/气体的单件质量本就是瓶内实装质量，元素统一按「1 件 = 1 mol」折算。</summary>
+        /// <summary>Mass tooltip for the current integer count.</summary>
         public static string TooltipLine(GameItem item)
         {
             string id = item?.identifier;
@@ -88,21 +69,21 @@ namespace Chemistry
                 return null;
             }
 
-            double unit = UnitMass(id);
+            int unit = UnitMass(id);
             if (unit <= 0)
             {
                 return null;
             }
 
-            return Line(unit * Math.Max(1, item.unitCount));
+            long total = (long)unit * Math.Max(1, item.unitCount);
+            return Line(total);
         }
 
         // ---------------------------------------------------------------
-        // 游戏称重系统（店里电子秤读的就是 WEIGHT_TAG）
+        // Game weight tag synchronization
         // ---------------------------------------------------------------
 
-        /// <summary>物品生成时挂上：先按当前件数写一次称重克数，再订阅数量变化，
-        /// 之后合并/拆分堆叠都会自动重写。原版物品不走物品工厂，天然不受影响。</summary>
+        /// <summary>Writes the current integer weight and keeps it synced with stack changes.</summary>
         public static void AttachWeight(GameItem item)
         {
             if (item == null)
@@ -114,11 +95,7 @@ namespace Chemistry
             item.onChangeAmountItemFunc += SyncWeight;
         }
 
-        /// <summary>
-        /// 把当前总质量写进游戏自带的称重标签（WEIGHT_TAG，整克）。
-        /// 只处理 chem_ 前缀的模组物品——原版物品（包括复用原版 ID 的 scrap_metal）一律不碰，
-        /// 定价也不会动：模组物品不在原版按公斤计价的 basePriceDictionary 里。
-        /// </summary>
+        /// <summary>Write whole grams to WEIGHT_TAG for Chemistry items only.</summary>
         public static void SyncWeight(GameItem item)
         {
             string id = item?.identifier;
@@ -127,52 +104,73 @@ namespace Chemistry
                 return;
             }
 
-            double unit = UnitMass(id);
+            int unit = UnitMass(id);
             if (unit <= 0)
             {
                 return;
             }
 
-            int grams = (int)Math.Round(unit * Math.Max(1, item.unitCount));
-            GeneralHelper.SetItemWeight(item, grams);
+            long total = (long)unit * Math.Max(1, item.unitCount);
+            GeneralHelper.SetItemWeight(item, (int)Math.Min(int.MaxValue, total));
         }
 
-        /// <summary>瓶内实装质量（克）；空瓶返回 0。</summary>
-        public static double ContentGrams(string itemId, int units)
+        /// <summary>Whole gram mass of fluid contents; empty or unregistered contents weigh zero.</summary>
+        public static long ContentGrams(string itemId, int units)
         {
             if (units <= 0)
             {
                 return 0;
             }
 
-            double milliliters = units * (double)ReagentBottle.MillilitersPerUnit;
-            if (ReagentBottle.IsGas(itemId))
+            if (ChemistryCatalog.FindElementByItemId(itemId) != null)
             {
-                double molar = MolarMassOf(itemId);
-                return molar > 0 ? milliliters / 22414d * molar : 0;
+                return (long)ElementUnitGrams * units;
             }
 
-            return milliliters * LiquidDensity(itemId);
+            if (!ReagentBottle.IsLiquid(itemId) && !ReagentBottle.IsGas(itemId))
+            {
+                return 0;
+            }
+
+            return (long)FluidUnitGrams(itemId) * units;
         }
 
-        public static string Line(double grams)
+        public static string Line(long grams)
         {
             return Loc.Get("item_mass_line", "质量  {0}", "Mass  {0}", Format(grams));
         }
 
-        /// <summary>公斤/克自动切换，小数点与语言无关。</summary>
-        public static string Format(double grams)
+        /// <summary>Format an integer gram value without fractional mass units.</summary>
+        public static string Format(long grams)
         {
-            return grams >= 1000d ? ChemUi.MassText(grams / 1000d) + " kg" : ChemUi.MassText(grams) + " g";
+            if (grams <= 0)
+            {
+                return "?";
+            }
+
+            if (grams < 1000)
+            {
+                return grams.ToString(CultureInfo.InvariantCulture) + " g";
+            }
+
+            long whole = grams / 1000;
+            int remainder = (int)(grams % 1000);
+            if (remainder == 0)
+            {
+                return whole.ToString(CultureInfo.InvariantCulture) + " kg";
+            }
+
+            string fraction = remainder.ToString("D3", CultureInfo.InvariantCulture).TrimEnd('0');
+            return whole.ToString(CultureInfo.InvariantCulture) + "." + fraction + " kg";
         }
 
         // ---------------------------------------------------------------
-        // 化学式量
+        // Formula mass used for non-fluid compounds and gas calculations
         // ---------------------------------------------------------------
 
         private static readonly Dictionary<string, double> MolarCache = new Dictionary<string, double>(StringComparer.Ordinal);
 
-        /// <summary>化合物的摩尔质量（式量，g/mol）；解析失败返回 0。</summary>
+        /// <summary>Compound formula mass in g/mol; zero when its formula cannot be parsed.</summary>
         public static double MolarMass(CompoundDef compound)
         {
             if (compound == null || string.IsNullOrEmpty(compound.Key))
@@ -231,9 +229,45 @@ namespace Chemistry
         }
 
         // ---------------------------------------------------------------
-        // 常见液体密度（g/mL）；其余默认按 1.0。
+        // Fluid mass conversion
         // ---------------------------------------------------------------
 
+        private static int FluidUnitGrams(string itemId)
+        {
+            double grams;
+            if (ReagentBottle.IsGas(itemId))
+            {
+                double molar = MolarMassOf(itemId);
+                grams = molar > 0
+                    ? molar / 22414d * ReagentBottle.MillilitersPerUnit
+                    : 0;
+            }
+            else
+            {
+                grams = ReagentBottle.MillilitersPerUnit * LiquidDensity(itemId);
+            }
+
+            // The integer gram scale cannot represent sub-gram gas portions. Keep every measurable
+            // fluid unit at least one gram so bottle counts and the weight tag stay in integer units.
+            return grams > 0 ? Math.Max(1, WholeGrams(grams)) : 0;
+        }
+
+        private static int WholeGrams(double grams)
+        {
+            if (grams <= 0 || double.IsNaN(grams))
+            {
+                return 0;
+            }
+
+            if (grams >= int.MaxValue)
+            {
+                return int.MaxValue;
+            }
+
+            return (int)Math.Round(grams, MidpointRounding.AwayFromZero);
+        }
+
+        // Common liquid density estimates (g/mL); unspecified liquids default to water density.
         private static readonly Dictionary<string, double> LiquidDensities = new Dictionary<string, double>
         {
             { "hydrogen_peroxide", 1.11 },
@@ -266,10 +300,10 @@ namespace Chemistry
         }
 
         // ---------------------------------------------------------------
-        // 非化学计量物品的固定质量（克）：器皿、工具、样品瓶、设备。
+        // Fixed integer mass for tools, containers, and equipment
         // ---------------------------------------------------------------
 
-        private static double FixedGrams(string itemId)
+        private static int FixedGrams(string itemId)
         {
             if (itemId.StartsWith(ChemistryCatalog.ItemPrefix + "leachate_", StringComparison.Ordinal))
             {
@@ -279,17 +313,16 @@ namespace Chemistry
             {
                 return 85;
             }
-            return Fixed.TryGetValue(itemId, out double grams) ? grams : 0;
+            return Fixed.TryGetValue(itemId, out int grams) ? grams : 0;
         }
 
-        private static readonly Dictionary<string, double> Fixed = BuildFixed();
+        private static readonly Dictionary<string, int> Fixed = BuildFixed();
 
-        private static Dictionary<string, double> BuildFixed()
+        private static Dictionary<string, int> BuildFixed()
         {
-            var table = new Dictionary<string, double>(StringComparer.Ordinal);
+            var table = new Dictionary<string, int>(StringComparer.Ordinal);
 
-            // 实验工具（ToolTable 的 32 件；光谱仪等大型设备以公斤计）。
-            var tools = new Dictionary<string, double>
+            var tools = new Dictionary<string, int>
             {
                 { "beaker", 65 },
                 { "conical_flask", 85 },
@@ -326,13 +359,12 @@ namespace Chemistry
             };
             foreach (ToolDef tool in ChemistryCatalog.Tools)
             {
-                if (tools.TryGetValue(tool.Key, out double grams))
+                if (tools.TryGetValue(tool.Key, out int grams))
                 {
                     table[ChemistryCatalog.ToolItemId(tool.Key)] = grams;
                 }
             }
 
-            // 空瓶与破损瓶（small / medium / large 三档）。
             AddBottleFamily(table, ReagentBottle.GlassEmpties, 25, 45, 70);
             AddBottleFamily(table, ReagentBottle.PlasticEmpties, 18, 32, 50);
             AddBottleFamily(table, ReagentBottle.GasEmpties, 55, 80, 110);
@@ -340,7 +372,6 @@ namespace Chemistry
             table[ReagentBottle.DamagedPlasticId] = 26;
             table[ReagentBottle.DamagedGasId] = 72;
 
-            // 桶装容器与废物桶。
             table[BulkContainers.DrumId] = 1400;
             table[BulkContainers.SteelId] = 2600;
             table[BulkContainers.EmptyLiquidWasteId] = 1500;
@@ -348,7 +379,6 @@ namespace Chemistry
             table[BulkContainers.EmptySolidWasteId] = 2200;
             table[BulkContainers.SolidWasteId] = 2200;
 
-            // 混合物/分析/流程里的固体形态。
             table[LabMixtureData.Cake] = 180;
             table[LabMixtureData.SaltCake] = 230;
             table[LabMixtureData.Crystals] = 160;
@@ -358,7 +388,6 @@ namespace Chemistry
             table[LabProcessData.SealedSalt] = 190;
             table[LabProcessData.LoadedCrystals] = 175;
 
-            // 硝酸生产线与厂房设备。
             table[NitricProductionData.CleanFeed] = 120;
             table[NitricProductionData.Crude] = 260;
             table[NitricProductionData.Refined] = 95;
@@ -374,8 +403,8 @@ namespace Chemistry
             return table;
         }
 
-        private static void AddBottleFamily(Dictionary<string, double> table, string[] ids,
-            double small, double medium, double large)
+        private static void AddBottleFamily(Dictionary<string, int> table, string[] ids,
+            int small, int medium, int large)
         {
             if (ids == null || ids.Length < 3)
             {

@@ -64,9 +64,10 @@ namespace Chemistry
                 }
 
                 int impurities = 100 - SumPercent(sample);
+                int impurityGrams = (int)(((long)sample.Grams * impurities + 50) / 100);
                 LabUi.Label(builder,
                     Loc.Get("sample_impurities_line", "杂质 {0}% · {1} g", "Impurities {0}% · {1} g",
-                        impurities, ChemUi.MassText(sample.Grams * impurities / 100.0)),
+                        impurities, ChemUi.MassText(impurityGrams)),
                     null, 12f, 520f, 22f, false, ChemUi.Dim, false, TextAlignmentOptions.Left);
 
                 LabUi.Label(builder,

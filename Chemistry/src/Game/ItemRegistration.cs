@@ -455,7 +455,7 @@ namespace Chemistry
             item.unitBaseValue = def.Value;
             item.unitValue = def.Value;
             item.unitCount = 1;
-            item.maxSlotAmountItemFunc = (_, _, _) => ItemMass.MaxStack(def.Mass);
+            item.maxSlotAmountItemFunc = (_, _, _) => ItemMass.MaxStack(ItemMass.ElementUnitGrams);
 
             string category = ChemistryCatalog.ElementCategoryLabel(def.Category, Loc.IsChinese);
             item.longDescription = BuildElementDescription(def, category);
