@@ -186,10 +186,22 @@ namespace Chemistry
         private bool Recover(GameItem sample, GameItem bottle)
         {
             var inputs = new List<(GameItem, int)> { (sample, 1), (bottle, 1) };
-            return MachineBatch.TryCommitMeasured(grid, inputs,
+            bool committed = MachineBatch.TryCommitMeasured(grid, inputs,
                 new MachineBatch.Product(Recipe.Solid, products),
                 new MachineBatch.Product(LabMixtureData.Water, liquids, LabMixtureData.Portion, ReagentBottle.SizeOf(bottle)),
                 new MachineBatch.Product(ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], returns));
+
+            // 固体单（DSC-07 工业盐）按实际入库的成品累计产量，所以提交成功才推进
+            if (committed)
+            {
+                CompoundDef solid = ChemistryCatalog.FindCompoundByItemId(Recipe.Solid);
+                if (solid != null)
+                {
+                    OrderService.OnCompoundProduced(solid, 1);
+                }
+            }
+
+            return committed;
         }
 
         private static void Advance(Stage stage, GameItem sample, string blocker, long now, int ticks, Func<bool> commit)

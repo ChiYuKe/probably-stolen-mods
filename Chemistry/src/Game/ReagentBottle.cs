@@ -77,6 +77,13 @@ namespace Chemistry
             return IsGas(id) || IsGasEmpty(id) ? BulkContainers.SteelCapacity : BulkContainers.DrumCapacity;
         }
 
+        /// <summary>Whole content units the target can still receive.</summary>
+        internal static int RemainingCapacity(GameItem target)
+        {
+            if (target == null || IsDamaged(target.identifier) || !IsBottle(target.identifier)) return 0;
+            return Math.Max(0, CapacityFor(target) - Contents(target));
+        }
+
         internal static int GasCapacity(GameItem vial) => Math.Max(CapacityFor(vial), vial.unitCount);
 
         internal static bool IsEmpty(string id) => IsLiquidEmpty(id) || IsGasEmpty(id);
@@ -311,15 +318,22 @@ namespace Chemistry
                 && source.MayRemove() && target.MayRemove()
                 && (IsEmptyTarget(target.identifier)
                     ? target.unitCount == 1
-                    : target.unitCount < CapacityFor(target))
+                    : RemainingCapacity(target) > 0)
                 && GeneralHelper.IsItemEffectivelyOwned(source) && GeneralHelper.IsItemEffectivelyOwned(target);
         }
 
         private static bool IsPourGrid(GameInventory inventory) =>
             inventory is GameGridInventory || (inventory != null && inventory == LabInventoryGrid.OpenGrid?.StorageInventoryArea);
 
-        internal static int TransferUnits(GameItem source, GameItem target, int limit) => Math.Max(0, Math.Min(limit,
-            Math.Min(source.unitCount, CapacityFor(target) - Contents(target))));
+        internal static int TransferUnits(GameItem source, GameItem target, int limit)
+        {
+            if (source == null || target == null || limit <= 0 || source.unitCount <= 0)
+            {
+                return 0;
+            }
+
+            return Math.Min(limit, Math.Min(source.unitCount, RemainingCapacity(target)));
+        }
 
         private static void PourByHand(GameItem source, GameItem target)
         {

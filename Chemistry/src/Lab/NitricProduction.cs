@@ -249,9 +249,15 @@ namespace Chemistry
                 step.Finish = 0;
                 GameInventory destination = Destination(index);
                 if (!automatic) step.Remaining--;
-                bool committed = index == steps.Length - 1
-                    ? MachineBatch.TryCommitBottled(grid, inputs,
-                        inputs.Find(input => ReagentBottle.IsGlassEmpty(input.Item.identifier)).Item, step.Product, destination)
+                bool last = index == steps.Length - 1;
+                GameItem filling = null;
+                if (last)
+                {
+                    int glass = inputs.FindIndex(input => ReagentBottle.IsGlassEmpty(input.Item.identifier));
+                    if (glass >= 0) filling = inputs[glass].Item;
+                }
+                bool committed = last
+                    ? MachineBatch.TryCommitBottled(grid, inputs, filling, step.Product, destination)
                     : MachineBatch.TryCommit(grid, inputs, (step.Product, destination));
                 if (!committed)
                 {
@@ -266,10 +272,12 @@ namespace Chemistry
                 }
 
                 step.Failure = null;
-                if (index == steps.Length - 1)
+                if (last)
                 {
                     if (automatic) produced++;
                     StoryService.OnLabSynthesized(NitricProductionData.Product);
+                    // TryCommitBottled 当前实际写入 1 个液量单位；容量只表示容器上限
+                    OrderService.OnCompoundProduced(NitricProductionData.Product, 1);
                 }
                 LabPanel.RefreshFromInventory();
             }

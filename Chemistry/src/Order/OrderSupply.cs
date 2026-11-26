@@ -314,6 +314,90 @@ namespace Chemistry
             }
         }
 
+        /// <summary>
+        /// 首单保底样品：接单时如果手上完全没有含铁废料（店里和实验室都没有），
+        /// 直接给一批 01 号样品，免得玩家第一次翻垃圾空手而归、回来发现单子做不下去。
+        /// 这不是借用工位，不占那一次机会。
+        /// </summary>
+        public static bool EnsureStarterSample(OrderTemplate template)
+        {
+            if (template == null || string.IsNullOrEmpty(template.TargetSymbol))
+            {
+                return false;
+            }
+
+            try
+            {
+                if (HasAnyScrapFor(template))
+                {
+                    return false;
+                }
+
+                SampleDef fallback = SampleTable.Find(ChemistryCatalog.ItemPrefix + "sample_01");
+                if (fallback == null)
+                {
+                    return false;
+                }
+
+                if (!Give(fallback.ItemId, 1))
+                {
+                    return false;
+                }
+
+                OrderService.InvalidateCounts();
+                string message = Loc.Get("order_starter_sample",
+                    "老锈塞给你一包保底样品（批次 {0}）：先拿光谱仪扫一遍，别空手回来。",
+                    "Old Rust hands you a guaranteed sample (batch {0}): scan it before you head down empty-handed.",
+                    fallback.Batch);
+                DayHudBridge.Push(message, "info", 8f);
+                ChemistryMod.Log?.Log("委托保底样品已发放：" + fallback.ItemId);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("发放保底样品失败：" + e.Message);
+                return false;
+            }
+        }
+
+        /// <summary>手上有没有这单用得上的废料（原版废金属或含目标元素的样品批次）。</summary>
+        private static bool HasAnyScrapFor(OrderTemplate template)
+        {
+            if (Has(SampleTable.VanillaScrapId))
+            {
+                return true;
+            }
+
+            SampleDef[] samples = SampleTable.All;
+            if (samples == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < samples.Length; i++)
+            {
+                SampleDef sample = samples[i];
+                if (sample?.Components == null)
+                {
+                    continue;
+                }
+
+                bool relevant = string.IsNullOrEmpty(template.TargetSymbol)
+                    || Array.Exists(sample.Components, c => string.Equals(c.Symbol, template.TargetSymbol, StringComparison.Ordinal));
+                if (!relevant)
+                {
+                    continue;
+                }
+
+                if (Has(sample.ItemId) || Has(sample.DetectedId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>这一单还能不能领借用工位：每个订单编号只能领一次。</summary>
         public static bool CanBorrow(OrderTemplate template)
         {
@@ -392,13 +476,21 @@ namespace Chemistry
                 return false;
             }
 
-            OrderService.MarkBorrowed(state.Number);
+            // 只有整批都放进去了才消耗这一次机会：仓库满时领一半，清出空间还能再领剩下的。
+            // 没领到的部分下次 Audit 还会列出来，所以不会重复发放。
+            if (failed.Count == 0)
+            {
+                OrderService.MarkBorrowed(state.Number);
+            }
+
             OrderService.InvalidateCounts();
 
             if (failed.Count > 0)
             {
-                message = Loc.Get("order_borrow_partial", "借到 {0} 件，还有 {1} 件没放进去（仓库满了）。",
-                    "Received {0} items; {1} could not be placed (store is full).", given, string.Join("、", failed.ToArray()));
+                message = Loc.Get("order_borrow_partial",
+                    "仓库放不下，只领到 {0} 件；还有 {1} 没进去。清出空间再来领一次，这次不算用掉机会。",
+                    "The store could not hold everything: {0} items handed out, {1} still missing. Free some space and claim again — this did not use up your one chance.",
+                    given, string.Join("、", failed.ToArray()));
             }
             else
             {

@@ -402,7 +402,32 @@ namespace Chemistry
 
                     LabUi.Label(builder, line, null, 12f, ContentWidth - 24f, 22f, false,
                         enough ? ChemUi.Good : ChemUi.Bad, false, TextAlignmentOptions.Left);
+
+                    if (requirement.Bottles > 0)
+                    {
+                        int full = SafeFullBottles(requirement);
+                        bool bottleOk = full >= requirement.Bottles;
+                        LabUi.Label(builder,
+                            Loc.Get("order_delivery_bottles", "满{0}瓶：{1}/{2}（半瓶、空瓶、其他尺寸不算）",
+                                "Full {0} bottles: {1}/{2} (partial, empty and other sizes do not count)",
+                                requirement.BottleSize == 0 ? Loc.Pick("小", "small")
+                                    : requirement.BottleSize == 1 ? Loc.Pick("中", "medium")
+                                    : requirement.BottleSize == 2 ? Loc.Pick("大", "large")
+                                    : Loc.Pick("任意尺寸", "any size"),
+                                full, requirement.Bottles),
+                            null, 11.5f, ContentWidth - 24f, 20f, false,
+                            bottleOk ? ChemUi.Good : ChemUi.Bad, false, TextAlignmentOptions.Left);
+                    }
                 }
+            }
+
+            if (template.Lots > 1)
+            {
+                LabUi.Label(builder,
+                    Loc.Get("order_delivery_lots", "分批：已交 {0}/{1} 批，两批都交完才结账。",
+                        "Lots: {0}/{1} delivered; the contract settles once all lots are in.",
+                        state.DeliveredLots, template.Lots),
+                    null, 12f, ContentWidth - 24f, 20f, false, ChemUi.Accent, false, TextAlignmentOptions.Left);
             }
 
             LabUi.Label(builder,
@@ -411,8 +436,13 @@ namespace Chemistry
 
             builder.BeginRow(6f, TextAnchor.MiddleLeft);
             bool canSettle = OrderService.CanSettle(out string reason);
-            LabUi.Button(builder, Loc.Get("order_deliver", "交付", "Deliver"),
-                delegate { Deliver(); }, 96f, 28f, canSettle, canSettle ? "" : reason);
+            string deliverLabel = template.Lots > 1
+                ? Loc.Get("order_deliver_lot", "交付第 {0}/{1} 批", "Deliver lot {0}/{1}",
+                    state.DeliveredLots + 1, template.Lots)
+                : Loc.Get("order_deliver", "交付", "Deliver");
+
+            LabUi.Button(builder, deliverLabel,
+                delegate { Deliver(); }, 116f, 28f, canSettle, canSettle ? "" : reason);
 
             bool canBorrow = OrderSupply.CanBorrow(template);
             LabUi.Button(builder, Loc.Get("order_borrow", "借用工位", "Loaner kit"),
@@ -795,6 +825,18 @@ namespace Chemistry
             try
             {
                 return OrderService.Deliverable(requirement);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static int SafeFullBottles(OrderRequirement requirement)
+        {
+            try
+            {
+                return OrderService.FullBottles(requirement);
             }
             catch
             {

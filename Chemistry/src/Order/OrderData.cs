@@ -27,12 +27,21 @@ namespace Chemistry
         public readonly string NoteZh;
         public readonly string NoteEn;
 
-        public OrderRequirement(string itemId, int count, string noteZh = null, string noteEn = null)
+        /// <summary>液体单子要求「满瓶」的数量。0 = 不校验瓶数。</summary>
+        public readonly int Bottles;
+
+        /// <summary>要求的容器尺寸（0 小 / 1 中 / 2 大）。-1 = 不限定。只有 Bottles &gt; 0 时生效。</summary>
+        public readonly int BottleSize;
+
+        public OrderRequirement(string itemId, int count, string noteZh = null, string noteEn = null,
+            int bottles = 0, int bottleSize = -1)
         {
             ItemId = itemId ?? "";
             Count = Math.Max(1, count);
             NoteZh = noteZh;
             NoteEn = noteEn;
+            Bottles = Math.Max(0, bottles);
+            BottleSize = bottleSize >= 0 && bottleSize <= 2 ? bottleSize : (Bottles > 0 ? 0 : -1);
         }
 
         public string Name
@@ -107,6 +116,12 @@ namespace Chemistry
         /// <summary>结算时一次性付的信用点。</summary>
         public int Reward;
 
+        /// <summary>
+        /// 要分几批交货才结清。1 = 一次交完（默认）；长期合同是 2：两批分别交付，合同只结清一次。
+        /// Requirements 里的数量是「每一批」的量。
+        /// </summary>
+        public int Lots = 1;
+
         /// <summary>期限（游戏天）。0 = 无期限，首单永远是 0。</summary>
         public int DurationDays;
 
@@ -121,6 +136,12 @@ namespace Chemistry
 
         /// <summary>最少游戏天数（工业线要等设备可建）。0 = 不限。</summary>
         public int RequiresDay;
+
+        /// <summary>
+        /// 要先做过一次成分检测才会派单。首单用它把「先翻垃圾、再检测、然后老锈才出现」的顺序固定下来，
+        /// 免得玩家还没体验过检测就被塞一张单子。
+        /// </summary>
+        public bool RequiresAnalysis;
 
         public OrderRequirement[] Requirements;
         public OrderStep[] Steps;
@@ -221,12 +242,26 @@ namespace Chemistry
                 }
 
                 string note = requirement.Note;
-                parts.Add(note.Length > 0
-                    ? requirement.Name + " ×" + requirement.Count + "（" + note + "）"
-                    : requirement.Name + " ×" + requirement.Count);
+                string line = requirement.Name + " ×" + requirement.Count;
+                if (requirement.Bottles > 0)
+                {
+                    string size = requirement.BottleSize == 0 ? Loc.Pick("小", "small")
+                        : requirement.BottleSize == 1 ? Loc.Pick("中", "medium")
+                        : requirement.BottleSize == 2 ? Loc.Pick("大", "large")
+                        : Loc.Pick("任意尺寸", "any size");
+                    line += Loc.Get("order_requirement_bottles", "（{0} 个满{1}瓶）", " ({0} full {1} bottles)", requirement.Bottles, size);
+                }
+
+                parts.Add(note.Length > 0 ? line + "（" + note + "）" : line);
             }
 
-            return string.Join("　·　", parts.ToArray());
+            string text = string.Join("　·　", parts.ToArray());
+            if (Lots > 1)
+            {
+                text = Loc.Get("order_requirement_lots", "{0} × {1} 批", "{0} × {1} lots", text, Lots);
+            }
+
+            return text;
         }
     }
 
@@ -288,6 +323,7 @@ namespace Chemistry
                     DurationDays = 0,
                     Repeatable = false,
                     RequiresDay = 0,
+                    RequiresAnalysis = true,
                     TargetSymbol = "Fe",
                     ReagentKey = "hydrochloric_acid",
                     Requirements = new[] { new OrderRequirement(Iron, 1, "亲手回收", "recovered by hand") },
@@ -375,12 +411,12 @@ namespace Chemistry
                     Repeatable = true,
                     RequiresOrder = "rust_trial_iron",
                     ReagentKey = "hydrochloric_acid",
-                    Requirements = new[] { new OrderRequirement(HydrochloricAcid, 12, "三小瓶", "three small bottles") },
+                    Requirements = new[] { new OrderRequirement(HydrochloricAcid, 12, "三小瓶", "three small bottles", 3, 0) },
                     Steps = new[]
                     {
                         new OrderStep("produce", "制备盐酸", "Prepare the hydrochloric acid",
-                            "在制酸装置或生产线做出至少 12 单位的盐酸，装进瓶子。",
-                            "Make at least 12 units of hydrochloric acid at the acid station or the production line, and bottle it."),
+                            "做出 12 单位盐酸并装进瓶子；单子上要的是 3 个满瓶，半瓶和空瓶不算。",
+                            "Make 12 units of hydrochloric acid and bottle it. The slip wants 3 full bottles — partial and empty bottles do not count."),
                         new OrderStep("deliver", "回店交货", "Deliver to the shop",
                             "带盐酸回当铺，在委托记录里确认交付。",
                             "Bring the acid back and confirm the delivery in the order journal."),
@@ -400,28 +436,29 @@ namespace Chemistry
                     RequesterZh = "DSC-07 采购员",
                     RequesterEn = "DSC-07 Buyer",
                     NpcId = "reagent_broker",
-                    BriefZh = "DSC-07 每个月都要二十桶硝酸，先给你第一批：24 单位。"
+                    BriefZh = "DSC-07 每个月都要二十桶硝酸，先给你两批：每批 24 单位，两批都交完才结账。"
                         + "走硝酸联机线，设好库存上限、补上动力、记得清理出料仓。"
                         + "断料或者满仓时，合同会停在那儿等你处理，不会自己扣钱。",
-                    BriefEn = "DSC-07 takes twenty drums of nitric acid a month. Your first lot is 24 units. "
+                    BriefEn = "DSC-07 takes twenty drums of nitric acid a month. Your first contract is two lots of 24 units each, settled once both are delivered. "
                         + "Run the nitric line: set the stock cap, keep the power topped up and clear the output bin. "
                         + "If the line starves or fills up, the contract waits for you — it never bills you behind your back.",
                     Reward = 900,
                     DurationDays = 0,
                     Repeatable = true,
+                    Lots = 2,
                     RequiresOrder = "rust_reagent_restock",
                     RequiresChapter = "ch5",
                     RequiresDay = IndustrialFactoryData.UnlockDay,
                     ReagentKey = "nitric_acid",
-                    Requirements = new[] { new OrderRequirement(NitricAcid, 24, "一批", "one lot") },
+                    Requirements = new[] { new OrderRequirement(NitricAcid, 24, "每批", "per lot") },
                     Steps = new[]
                     {
                         new OrderStep("produce", "生产硝酸", "Produce the nitric acid",
-                            "用硝酸联机线产出 24 单位硝酸，出料仓满了先清仓。",
-                            "Run the nitric line for 24 units; clear the output bin if it fills up."),
-                        new OrderStep("deliver", "交付第一批", "Deliver the first lot",
-                            "带硝酸回当铺，在委托记录里确认交付。合同结清后可以接下一批。",
-                            "Bring the acid back and confirm the delivery. The contract reopens for the next lot once settled."),
+                            "用硝酸联机线累计产出 24 单位硝酸，出料仓满了先清仓。",
+                            "Produce 24 units of nitric acid on the nitric line; clear the output bin if it fills up."),
+                        new OrderStep("deliver", "分两批交付", "Deliver in two lots",
+                            "每批 24 单位，分两次交；两批都交完合同才结清。",
+                            "24 units per lot, delivered twice. The contract settles once both lots are in."),
                     },
                     TeachingSteps = new[] { "produce" },
                 },
@@ -436,23 +473,24 @@ namespace Chemistry
                     RequesterEn = "DSC-07 Buyer",
                     NpcId = "reagent_broker",
                     BriefZh = "固体这一单走独立工业车间：盐液结晶线出湿晶，干燥箱出成品。"
-                        + "DSC-07 要 8 单位工业盐。哪条线先交、留多少库存，你自己排。",
+                        + "DSC-07 要 8 单位工业盐，分两批交。哪条线先交、留多少库存，你自己排。",
                     BriefEn = "The solid order runs through the separate industrial workshop: the brine line makes wet crystals, the dryer finishes them. "
-                        + "DSC-07 wants 8 units of industrial salt. Which line ships first, and how much stock you keep, is your call.",
+                        + "DSC-07 wants 8 units of industrial salt per lot, in two lots. Which line ships first, and how much stock you keep, is your call.",
                     Reward = 700,
                     DurationDays = 0,
                     Repeatable = true,
+                    Lots = 2,
                     RequiresOrder = "dsc_nitric_contract",
                     RequiresDay = IndustrialFactoryData.UnlockDay,
                     Requirements = new[] { new OrderRequirement(Salt, 8, "工业级", "industrial grade") },
                     Steps = new[]
                     {
                         new OrderStep("produce", "产出工业盐", "Produce the industrial salt",
-                            "在工业车间跑盐液结晶线，再用干燥箱出成品。",
-                            "Run the brine crystallization route in the workshop, then finish the product in the drying oven."),
-                        new OrderStep("deliver", "交付一批", "Deliver a lot",
-                            "带盐回当铺，在委托记录里确认交付。",
-                            "Bring the salt back and confirm the delivery in the order journal."),
+                            "在工业车间跑盐液结晶线，再用干燥箱出成品，累计 8 单位。",
+                            "Run the brine crystallization route in the workshop, then finish the product in the drying oven for 8 units."),
+                        new OrderStep("deliver", "分两批交付", "Deliver in two lots",
+                            "每批 8 单位，分两次交；两批都交完合同才结清。",
+                            "8 units per lot, delivered twice. The contract settles once both lots are in."),
                     },
                     TeachingSteps = new[] { "produce" },
                 },

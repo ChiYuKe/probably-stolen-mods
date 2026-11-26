@@ -140,6 +140,25 @@ namespace Chemistry
             return null;
         }
 
+        public static CompoundDef FindCompoundByItemId(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId))
+            {
+                return null;
+            }
+
+            CompoundDef[] all = Compounds;
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (string.Equals(all[i].ItemId, itemId, StringComparison.Ordinal))
+                {
+                    return all[i];
+                }
+            }
+
+            return null;
+        }
+
         // ---- 分类显示名（UI、物品描述都用这一份，别到处抄） ----
 
         public static string ElementCategoryLabel(string key, bool zh)

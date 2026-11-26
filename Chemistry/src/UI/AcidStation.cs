@@ -430,7 +430,7 @@ namespace Chemistry
                     if (result != ReagentBottle.DamagedGlassId)
                     {
                         StoryService.OnLabSynthesized(recipe);
-                        OrderService.OnCompoundProduced(recipe);
+                        OrderService.OnCompoundProduced(recipe, 1);
                     }
                     LabPanel.RefreshFromInventory();
                 }

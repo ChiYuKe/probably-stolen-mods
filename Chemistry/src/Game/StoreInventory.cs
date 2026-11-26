@@ -184,6 +184,138 @@ namespace Chemistry
             return result;
         }
 
+        /// <summary>店里装满的指定尺寸液体瓶数。</summary>
+        public static int CountFullBottles(string liquidId, int bottleSize)
+        {
+            if (string.IsNullOrEmpty(liquidId))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            foreach (GameItem item in AllItems())
+            {
+                if (IsFullBottle(item, liquidId, bottleSize))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool IsFullBottle(GameItem item, string liquidId, int bottleSize)
+        {
+            if (item == null || !string.Equals(item.identifier, liquidId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            try
+            {
+                if (SafeMaxRemove(item) <= 0 || (bottleSize >= 0 && ReagentBottle.SizeOf(item) != bottleSize))
+                {
+                    return false;
+                }
+
+                int capacity = ReagentBottle.CapacityFor(item);
+                return capacity > 0 && ReagentBottle.Contents(item) >= capacity;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 校验并扣除指定数量、指定尺寸的满瓶。只从匹配的满瓶扣除，不拆用中大瓶或半瓶。
+        /// 结算前整体校验，确认后才修改库存。
+        /// </summary>
+        public static bool TryConsumeBottled(string liquidId, int units, int fullBottles, int bottleSize)
+        {
+            if (string.IsNullOrEmpty(liquidId) || units <= 0 || fullBottles <= 0 || bottleSize < 0 || bottleSize > 2)
+            {
+                return false;
+            }
+
+            var full = new List<GameItem>();
+            int available = 0;
+            foreach (GameItem item in AllItems())
+            {
+                if (!IsFullBottle(item, liquidId, bottleSize))
+                {
+                    continue;
+                }
+
+                full.Add(item);
+                available += Math.Min(item.unitCount, SafeMaxRemove(item));
+            }
+
+            int capacity = ReagentBottle.CapacityFor(liquidId, bottleSize);
+            if (capacity <= 0 || units != capacity * fullBottles || full.Count < fullBottles || available < units)
+            {
+                return false;
+            }
+
+            // 每个匹配瓶都必须完整交付，不从瓶内剩余液量或其他尺寸补差额。
+            int remaining = units;
+            for (int i = 0; i < full.Count && remaining > 0; i++)
+            {
+                GameItem item = full[i];
+                int take = Math.Min(remaining, Math.Min(item.unitCount, SafeMaxRemove(item)));
+                if (take <= 0)
+                {
+                    continue;
+                }
+
+                int left = item.unitCount - take;
+                if (left <= 0)
+                {
+                    item.Destroy();
+                }
+                else
+                {
+                    item.SetUnitCount(left);
+                }
+
+                remaining -= take;
+            }
+
+            return remaining == 0;
+        }
+
+        private static int ConsumeFrom(List<GameItem> items, int units)
+        {
+            int remaining = units;
+            foreach (GameItem item in items)
+            {
+                if (remaining <= 0)
+                {
+                    break;
+                }
+
+                int take = Math.Min(remaining, Math.Min(item.unitCount, SafeMaxRemove(item)));
+                if (take <= 0)
+                {
+                    continue;
+                }
+
+                int left = item.unitCount - take;
+                if (left <= 0)
+                {
+                    item.Destroy();
+                }
+                else
+                {
+                    item.SetUnitCount(left);
+                }
+
+                remaining -= take;
+            }
+
+            return remaining;
+        }
+
         private static int SafeMaxRemove(GameItem item)
         {
             try
