@@ -411,3 +411,136 @@ dotnet run -c Release
 3. 加工中读档、交付前后读档，委托进度按该档恢复。
 4. 委托页在 F6 实验台 / 地下实验室面板 / F9 独立窗口三处都能打开并刷新。
 5. 接单/收货 NPC 每天最多来一次，错过之后仍能从委托页接单。
+
+---
+
+# 委托线复验：两处进度卡点 + 三处规则缺口（2026-11-26 晚）
+
+上一轮验收指出 5 个问题，逐条修掉并补了自检。
+
+## P1-1 接单前的检测不计入首单
+
+**原因**：`OnSampleAnalyzed` 只在有进行中的委托时才记步骤，玩家先扫废料再点接单，
+这一步就被跳过了。
+
+**修法**：加全局履历 `order_seen` / `order_made` / `order_recovered` / `order_produced`，
+四个进度事件先写履历再推进当前委托；`Accept` 时按履历补记步骤（`SeedFromHistory`）。
+所以「先扫了再点接单」不会被判成没做过，`produce` 也改成按累计产量判定。
+
+## P1-2 工业线出料不推进合同
+
+**原因**：硝酸联机线和工业车间出料后只通知故事线，`OrderService` 收不到；
+而且合同要 24 单位，单批产出永远到不了，一次性事件根本判不出来。
+
+**修法**：`OnCompoundProduced(def, units)` 带实际入库单位数；
+`NitricProduction` 灌装成功按 `MachineBatch` 实际提交的 `Product.Units` 调用（当前每批 1 单位），
+`IndustrialFactory.Recover` 提交成功按 1 单位调用；容器容量只表示上限，不作为生产量。
+`produce` 步骤改成「累计产量 ≥ 每批交付量」。
+
+## P1-3 首晚发现流程未接通
+
+**修法**：
+
+- `LootIntegration.Hook()` 订阅 `ModHook.OnLootRolled`：垃圾场首翻不是含铁样品时临时换成批次 01，
+  只允许一件掉落待确认；延迟检查只有在含铁样品确实进入玩家库存后才写 `loot_first_sample`。
+  背包满或掉落未拾取时释放待确认状态，之后翻找仍可重试。
+- `OrderService.OnSampleAnalyzed` 先记录样品成分；首单 `RequiresAnalysis` 检查必须含 `Fe` 的履历，
+  不含铁样品的报告不解锁老锈。成功查看含铁样品报告时也能确认保底样品已实际取得。
+- 接单时如果手上完全没有含目标元素的废料，再补一批 01 号样品（`EnsureStarterSample`），
+  不占用借用工位的机会。
+
+## P2-1 仓满时会用掉整次借用机会
+
+**修法**：`OrderSupply.Borrow` 只有整批都放进仓库才 `MarkBorrowed`；
+仓库满时领到一部分，清出空间还能再领剩下的（没领到的部分下次 `Audit` 仍会列出来，不会重复发放）。
+
+## P2-2 M3 / M4 的交付规则与验收表不一致
+
+**修法**：
+
+- `OrderRequirement.Bottles` + `BottleSize`：补货单要求 3 个满装小瓶（每瓶 4 单位）。`CanSettle` 校验指定尺寸，
+  中大瓶、半瓶、空瓶、破损瓶和别的液体都不算；`TryConsumeBottled` 只扣匹配的满小瓶，完整移除三瓶，
+  不从半瓶补差，也不留下空瓶。
+- 发钱失败后的 `Refund` 会按原 `BottleSize` 和 `Bottles` 重建满瓶；普通堆叠物则按 `Count` 恢复原数量。
+- `OrderTemplate.Lots`：DSC-07 两张合同各分 2 批交付，每次只扣一批并记 `DeliveredLots`，
+  交满批数才付一次钱。
+
+## 顺带修掉的两个 bug
+
+- **可重复委托的前置永远不满足**：`completed` 原来只在一次性委托结算时写入，
+  导致「长期合同要求先做完补货单」永远解锁不了。现在改成「至少结清过一次」就写入，
+  能不能再接由 `Repeatable` 单独控制。
+- **`IndustrialFactory` 用错查表方式**：`Route.Solid` 是物品 id，原来拿它去 `FindCompound`（按 key 查）。
+  新增 `ChemistryCatalog.FindCompoundByItemId`。
+
+## 自检（`Chemistry/bin/order-check/harness`，本地工程，不进仓库）
+
+```
+dotnet run -c Release
+-> PASS: 5 order templates, 118 element channels, pre-accept iron scan, actual-unit production,
+   guaranteed sample confirmation, exact small-bottle delivery, lot settlement, partial borrow and purchase all behave.
+```
+
+新增断言：接单前扫过的含铁报告能抵掉 `report`，不含铁报告不能解锁首单；
+接单时空仓库会发保底样品；累计产量按实际提交单位；单个大瓶和半瓶组合都不能替代三只满小瓶；
+三只满小瓶交付会整瓶扣除；模拟发钱失败后仍恢复三只满小瓶；仓库只放得下 2 件时借用机会不被消耗，
+补齐后才消耗；合同第一批不结账、第二批付一次钱；重置会清掉全局履历。
+
+## 编译
+
+```
+dotnet build ProbablyStolenMods.sln -c Release -p:DeployToMods=false
+-> 已成功生成。0 个警告，0 个错误
+```
+
+`tools/verify.py --skip-build`：PASS 125 / FAIL 8，失败项与改动前完全一致
+（LAB-3/15/16 容量 144、ART-1/5 素材规格、TYP-4 元素描述、SAMPLE-6 反应台入口、API-1 反射成员），
+都不是本轮引入的。
+
+## 仍需实机确认
+
+1. 新档第一次翻垃圾是否稳定拿到一件可送检样品（保底只生效一次）。
+2. 没扫过任何东西时委托页不出现老锈，扫过之后当天或次日出现。
+3. 硝酸联机线自动跑满 24 单位后，合同页的「生产」步骤自动勾上。
+4. 补货单：3 个满瓶能交，改成 2 满瓶 + 1 半瓶后按钮灰掉并给出原因。
+5. 合同第一批交完不结账、第二批交完付一次 900。
+
+---
+
+# 委托复验：产量单位、首翻保底、小瓶交付（2026-11-26）
+
+本轮复核发现三处规则仍与路线图不一致，并补上回归测试。
+
+## P1 制酸与工业线按容器容量记产量
+
+`TryCommitBottled` 每次只把 `Product.Units`（当前默认 1）写进输出槽；之前按瓶型容量调用 `OnCompoundProduced`，选择大瓶会虚增产量、合同可提前勾完。现改为严格按实际提交单位计数：酸站和硝酸线每次灌装成功记 1 单位，工业车间出料按实际 `Product.Units` 记账。瓶容量只作上限，不再当产量。
+
+## P1 首翻保底可能被丢失
+
+`OnLootRolled` 在实例化和放入玩家库存之前触发，不能当作玩家已拿到物品。之前即时写入 `loot_first_sample`，若背包满或物品被丢弃，保底机会就永久消耗。现改为：垃圾场非含铁样品临时替换为含铁的批次 01，设置内存待确认状态并延迟检查；只有含铁样品实际进入玩家可用库存才写入存档，失败则释放状态，后续翻找可重试。一次多物品翻找最多替换一件，避免连抽多个批次 01。
+
+首单门槛也改为要求全局履历里出现 `Fe`：只有检测含铁样品的报告才解锁；非铁报告不会解锁老锈。打开含铁样品报告能直接确认样品已取得。
+
+## P2 “三小瓶”仍可用大瓶代替
+
+之前只按满瓶数量统计，未按指定尺寸筛选；扣除时还会从其他瓶或半瓶补差。现新增 `OrderRequirement.BottleSize`：盐酸补货要求 3 个满小瓶（每瓶 4 单位），校验必须同时满足瓶数、尺寸和总量；结算完整扣除三只满小瓶，不接受一只大瓶、半瓶组合或中瓶替代，也不会留下空瓶。付款失败的回滚会按原瓶型和装量重建三只小瓶；普通物品回滚也按原需求数量恢复。
+
+## 回归与构建
+
+```
+dotnet build ProbablyStolenMods.sln -c Release -p:DeployToMods=false
+-> 已成功生成。0 个警告，0 个错误
+
+dotnet run -c Release  (Chemistry/bin/order-check/harness)
+-> PASS: 5 order templates, 118 element channels, pre-accept iron scan, actual-unit production,
+   guaranteed sample confirmation, exact small-bottle delivery, lot settlement, partial borrow and purchase all behave.
+```
+
+测试覆盖：含铁报告门槛、接单前报告计入、生产累计按实际单位、大瓶/半瓶拒收、三只满小瓶准确扣除、模拟付款失败后三瓶原样回滚、首翻保底确认、长期合同分批付款及部分借用重试。
+
+## 仍需实机确认
+
+1. 首次垃圾场翻找遇背包满时，批次 01 未入库且下一次翻找仍能获得保底。
+2. 首次翻找已产出一组多物品时，最多只有其中一件被替换为批次 01。
+3. 盐酸补货显示满小瓶计数；三只小瓶可交、一只大瓶或半瓶组合不可交，付款失败时库存图标和瓶型正确恢复。
+4. 硝酸联机线生产一件仅增加其真实 `unitCount` 的累计产量，不按大瓶容量跳跃。
