@@ -20,8 +20,10 @@ namespace Chemistry
         private MachineryStack plusPage;
         private MachineryStack minusPage;
         private CustomUIWindow renameWindow;
+        private CustomUIWindow warehousePurchaseWindow;
         private CustomUIElement renameInput;
         private int renameIndex = -1;
+        private int pendingWarehousePrice;
         private readonly List<StorageInventory> warehouseGrids = new List<StorageInventory>();
         private int activePage;
         private readonly Dictionary<StorageFilter, MachineryButton> filterButtons = new Dictionary<StorageFilter, MachineryButton>();
@@ -261,6 +263,7 @@ namespace Chemistry
             {
                 active = null;
                 view.CloseRenameWindow();
+                view.CloseWarehousePurchaseWindow();
                 NitricProduction.Close();
                 IndustrialFactory.Close();
                 AcidStation.Close();
@@ -624,7 +627,8 @@ namespace Chemistry
             {
                 if (pageTabs.GetPage(index) == plusPage)
                 {
-                    CreateWarehouse();
+                    pageTabs.Select(activePage);
+                    OpenWarehousePurchaseConfirmation();
                 }
                 else
                 {
@@ -743,6 +747,99 @@ namespace Chemistry
                 return inventory;
             }
             return page - 1 < warehouseGrids.Count ? warehouseGrids[page - 1] : null;
+        }
+
+        private void OpenWarehousePurchaseConfirmation()
+        {
+            if (LabWarehouses.Count >= LabWarehouses.MaxCount)
+            {
+                DayHudBridge.Push(Loc.Get("lab_warehouse_limit",
+                    "自定义仓库最多 {0} 个，请先删除一些。",
+                    "Custom warehouses are limited to {0}; delete some first.", LabWarehouses.MaxCount),
+                    "warn", 3f);
+                return;
+            }
+
+            if (warehousePurchaseWindow?.IsAlive == true)
+            {
+                warehousePurchaseWindow.Show();
+                return;
+            }
+
+            int price = LabWarehouses.PriceFor(LabWarehouses.Count);
+            CustomUIBuilder builder = CustomUIManager.Window("chem_warehouse_purchase",
+                Loc.Get("lab_warehouse_purchase_title", "解锁自定义仓库", "Unlock warehouse"));
+            if (builder?.Handle == null)
+            {
+                ChemistryMod.Log?.Warning("创建仓库解锁确认窗口失败");
+                return;
+            }
+
+            pendingWarehousePrice = price;
+            warehousePurchaseWindow = builder.Handle;
+            builder.SetSize(360f, 142f)
+                .SetDraggable(true)
+                .SetCloseOnEscape(true)
+                .Center()
+                .OnClose(() =>
+                {
+                    warehousePurchaseWindow = null;
+                    pendingWarehousePrice = 0;
+                });
+
+            builder.AddLabel(Loc.Get("lab_warehouse_purchase_prompt",
+                "花费 ${0} 解锁一个新仓库？", "Spend ${0} to unlock a new warehouse?", price), "prompt");
+            ChemUi.Style(builder.Last, 14f, 320f, 48f, true, ChemUi.Main, false, TMPro.TextAlignmentOptions.Center);
+
+            builder.BeginRow(8f, TextAnchor.MiddleCenter);
+            builder.AddButton(Loc.Get("lab_warehouse_purchase_confirm", "确认解锁", "Unlock"), ConfirmWarehousePurchase, "confirm");
+            builder.Last.SetPreferredSize(120f, 28f);
+            builder.AddButton(Loc.Get("lab_warehouse_purchase_cancel", "取消", "Cancel"), CloseWarehousePurchaseWindow, "cancel");
+            builder.Last.SetPreferredSize(120f, 28f);
+            builder.End();
+            builder.Show();
+        }
+
+        private void ConfirmWarehousePurchase()
+        {
+            if (LabWarehouses.Count >= LabWarehouses.MaxCount)
+            {
+                CloseWarehousePurchaseWindow();
+                DayHudBridge.Push(Loc.Get("lab_warehouse_limit",
+                    "自定义仓库最多 {0} 个，请先删除一些。",
+                    "Custom warehouses are limited to {0}; delete some first.", LabWarehouses.MaxCount),
+                    "warn", 3f);
+                return;
+            }
+
+            int currentPrice = LabWarehouses.PriceFor(LabWarehouses.Count);
+            if (currentPrice != pendingWarehousePrice)
+            {
+                CloseWarehousePurchaseWindow();
+                OpenWarehousePurchaseConfirmation();
+                return;
+            }
+
+            CloseWarehousePurchaseWindow();
+            CreateWarehouse();
+        }
+
+        private void CloseWarehousePurchaseWindow()
+        {
+            pendingWarehousePrice = 0;
+            CustomUIWindow current = warehousePurchaseWindow;
+            warehousePurchaseWindow = null;
+            try
+            {
+                if (current != null && current.IsAlive)
+                {
+                    current.Close();
+                }
+            }
+            catch
+            {
+                // The window may already have been closed by the UI manager.
+            }
         }
 
         private void CreateWarehouse()
