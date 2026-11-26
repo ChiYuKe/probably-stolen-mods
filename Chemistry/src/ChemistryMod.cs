@@ -151,6 +151,7 @@ namespace Chemistry
                 ModHook.OnGenerateCustomerLate += OrderNpcService.QueueForDay;
                 ModHook.OnNewGameStarted += OnNewGameStarted;
                 ModHook.OnCreateTooltipLate += LabWorkflow.AddTooltip;
+                LootIntegration.Hook();
             }
             catch (Exception e)
             {
@@ -205,6 +206,7 @@ namespace Chemistry
 
             try
             {
+                LootIntegration.Unhook();
                 LootIntegration.Remove();
             }
             catch
@@ -372,6 +374,8 @@ namespace Chemistry
                 LabWarehouses.EnsureLoaded();
                 StoryService.EnsureLoaded();
                 OrderService.EnsureLoaded();
+                // 新档重新给一次首翻保底
+                LootIntegration.ResetFirstSample();
             }
             catch (Exception e)
             {

@@ -28,6 +28,12 @@ namespace Chemistry
 
         private static bool applied;
 
+        /// <summary>首翻保底样品是否已经发过（存进模组存档，新档重置）。</summary>
+        private const string FirstSampleKey = "loot_first_sample";
+
+        private static bool hooked;
+        private static bool pendingFirstSample;
+
         public static bool Applied
         {
             get { return applied; }
@@ -130,6 +136,195 @@ namespace Chemistry
             {
                 int tier = LabEquipmentData.Find(def.Key)?.Tier ?? 1;
                 ModHelper.AddLootEntry(ChemistryCatalog.ModId, VanillaToolTable, def.ItemId, tier == 1 ? 4f : tier == 2 ? 2.5f : 1.25f);
+            }
+        }
+
+        /// <summary>
+        /// 首翻保底：第一次在垃圾场翻出东西时，如果抽到的不是可送检样品，就换成批次 01。
+        /// 只保底一次（存档记 `loot_first_sample`），其余掉落仍按现有掉落表随机。
+        /// </summary>
+        public static void Hook()
+        {
+            if (hooked)
+            {
+                return;
+            }
+
+            try
+            {
+                ModHook.OnLootRolled += OnLootRolled;
+                hooked = true;
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("挂掉落保底失败（不影响玩耍）：" + e.Message);
+            }
+        }
+
+        public static void Unhook()
+        {
+            if (!hooked)
+            {
+                return;
+            }
+
+            try
+            {
+                ModHook.OnLootRolled -= OnLootRolled;
+            }
+            catch
+            {
+                // 关游戏时事件表可能已经清空，忽略
+            }
+
+            hooked = false;
+        }
+
+        private static void OnLootRolled(LootRollContext context)
+        {
+            try
+            {
+                if (context == null || string.IsNullOrEmpty(context.itemId))
+                {
+                    return;
+                }
+
+                string group = context.groupId ?? "";
+                if (!group.StartsWith(DumpingGroundGroup, StringComparison.Ordinal)
+                    && !group.StartsWith(DumpingGroundFreshGroup, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                if (HasFirstSample() || pendingFirstSample)
+                {
+                    return;
+                }
+
+                // 非铁样品不能消耗铁路线保底；改成批次 01，直到含铁样品确实进入玩家库存。
+                SampleDef rolled = SampleTable.Find(context.itemId);
+                if (!ContainsIron(rolled))
+                {
+                    SampleDef fallback = SampleTable.Find(ChemistryCatalog.ItemPrefix + "sample_01");
+                    if (fallback == null)
+                    {
+                        return;
+                    }
+
+                    context.itemId = fallback.ItemId;
+                    ChemistryMod.Log?.Log("首翻保底：把掉落换成含铁的批次 01 未知金属碎片");
+                }
+
+                pendingFirstSample = true;
+                ScheduleConfirmFirstSample();
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("掉落保底处理失败：" + e.Message);
+            }
+        }
+
+        private static void ScheduleConfirmFirstSample()
+        {
+            try
+            {
+                ModHelper.Delay(ChemistryCatalog.ModId, 0.5f, ConfirmFirstSampleCollected);
+            }
+            catch (Exception e)
+            {
+                pendingFirstSample = false;
+                ChemistryMod.Log?.Warning("安排保底确认失败：" + e.Message);
+            }
+        }
+
+        private static bool ContainsIron(SampleDef sample)
+        {
+            return sample?.Components != null
+                && Array.Exists(sample.Components, component => string.Equals(component.Symbol, "Fe", StringComparison.Ordinal));
+        }
+
+        /// <summary>只有已入库的含铁样品才永久消耗首翻保底。</summary>
+        private static void ConfirmFirstSampleCollected()
+        {
+            if (HasFirstSample())
+            {
+                pendingFirstSample = false;
+                return;
+            }
+
+            try
+            {
+                Dictionary<string, int> counts = StoreInventory.CountUnits();
+                foreach (SampleDef sample in SampleTable.All)
+                {
+                    if (!ContainsIron(sample))
+                    {
+                        continue;
+                    }
+
+                    if ((counts.TryGetValue(sample.ItemId, out int raw) && raw > 0)
+                        || (counts.TryGetValue(sample.DetectedId, out int detected) && detected > 0))
+                    {
+                        MarkFirstSample();
+                        return;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("确认首翻样品失败：" + e.Message);
+            }
+            finally
+            {
+                pendingFirstSample = false;
+            }
+        }
+
+        /// <summary>查看含铁样品的成分报告时，这是实际持有该样品的确定证据。</summary>
+        public static void ConfirmSampleAnalyzed(SampleDef sample)
+        {
+            if (ContainsIron(sample))
+            {
+                MarkFirstSample();
+            }
+        }
+
+        private static bool HasFirstSample()
+        {
+            try
+            {
+                return ModHelper.GetModDataBool(ChemistryCatalog.ModId, FirstSampleKey, false);
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static void MarkFirstSample()
+        {
+            try
+            {
+                ModHelper.SetModDataBool(ChemistryCatalog.ModId, FirstSampleKey, true);
+                pendingFirstSample = false;
+            }
+            catch (Exception e)
+            {
+                ChemistryMod.Log?.Warning("记录首翻保底失败：" + e.Message);
+            }
+        }
+
+        /// <summary>新档时清掉保底标记，让下一档也能保底一次。</summary>
+        public static void ResetFirstSample()
+        {
+            pendingFirstSample = false;
+            try
+            {
+                ModHelper.SetModDataBool(ChemistryCatalog.ModId, FirstSampleKey, false);
+            }
+            catch
+            {
+                // 忽略
             }
         }
 
