@@ -413,26 +413,75 @@ namespace Chemistry
 
         internal static void GiveEquipmentKit(int tier)
         {
-            var supplies = LabEquipmentData.All.Where(def => def.Tier == tier)
-                .ToDictionary(def => ChemistryCatalog.ToolItemId(def.Key), _ => 1);
-            supplies.Add("energy_credit", 1);
-            string water = ChemistryCatalog.CompoundItemId("water");
-            supplies.Add(water, ReagentBottle.CapacityFor(water));
-            supplies.Add(ReagentBottle.EmptyId, 3);
-            supplies.Add(SampleTable.All[0].ItemId, 2);
-            if (tier <= 2)
+            var supplies = new List<(string Id, int Units, int Size)>();
+            foreach (LabEquipmentDef equipment in LabEquipmentData.All.Where(def => def.Tier == tier))
             {
-                supplies.Add(LabRefining.IntermediateId("Fe", false), 2);
+                supplies.Add((ChemistryCatalog.ToolItemId(equipment.Key), 1, -1));
             }
-            if (tier >= 2)
+
+            // 测试包自带电源、分开装好的水样，以及可供称量和观察的固体样品。
+            supplies.Add(("energy_credit", 1, -1));
+            AddEquipmentBottle(supplies, LabMixtureData.Water, LabMixtureData.Portion);
+            AddEquipmentBottle(supplies, LabMixtureData.Water, LabMixtureData.Portion);
+            supplies.Add((SampleTable.All[0].ItemId, 2, -1));
+
+            if (tier == 1)
             {
-                supplies.Add(SampleTable.All.First(sample => sample.Batch == "09").DetectedId, 2);
+                // 烧杯配液、锥形瓶静置、移液和漏斗过滤都能直接开测。
+                AddEquipmentBottle(supplies, LabMixtureData.Oil, LabMixtureData.Portion);
+                supplies.Add((LabMixtureData.Salt, 1, -1));
+                supplies.Add((LabMixtureData.Emulsion, 1, -1));
+                supplies.Add((LabMixtureData.Suspension, 1, -1));
+                supplies.Add((LabMixtureData.Brine, 1, -1));
+                supplies.Add((LabRefining.IntermediateId("Fe", false), 2, -1));
+                supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 2, -1));
             }
-            if (tier == 3)
+            else if (tier == 2)
             {
-                supplies.Add(SampleTable.All.First(sample => sample.Batch == "13").ItemId, 2);
+                // 二级设备所需的分层、蒸馏、集气、析晶和干燥样品均直接备好。
+                supplies.Add((LabMixtureData.Salt, 1, -1));
+                supplies.Add((LabMixtureData.Emulsion, 1, -1));
+                supplies.Add((LabMixtureData.Suspension, 1, -1));
+                supplies.Add((LabMixtureData.Layers, 1, -1));
+                supplies.Add((LabMixtureData.Brine, 1, -1));
+                supplies.Add((LabProcessData.BrineAliquot, LabMixtureData.Portion, LabMixtureData.SmallBottle));
+                supplies.Add((LabMixtureData.Cake, 1, -1));
+                supplies.Add((LabMixtureData.SaltCake, 1, -1));
+                supplies.Add((LabDistillationData.Feed, 2, -1));
+                supplies.Add((LabProcessData.MineralWater, 1, -1));
+                supplies.Add((LabAnalysisData.Acid, 2, ReagentBottle.Medium));
+                supplies.Add((SampleTable.All.First(sample => sample.Batch == "09").DetectedId, 2, -1));
+                supplies.Add((ReagentBottle.GasEmpties[LabMixtureData.SmallBottle], 1, -1));
+                supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 4, -1));
+                supplies.Add((ChemistryCatalog.ToolItemId("test_tube"), 1, -1));
             }
+            else if (tier == 3)
+            {
+                // 三级设备附滴定标准液、色谱样、冻干样、蒸馏料和手套箱封装样。
+                supplies.Add((LabAnalysisData.Acid, 2, ReagentBottle.Medium));
+                supplies.Add((LabAnalysisData.Titrant, 6, ReagentBottle.Medium));
+                AddEquipmentBottle(supplies, LabAnalysisData.Dye, LabMixtureData.Portion);
+                AddEquipmentBottle(supplies, LabProcessData.OilTrace, LabMixtureData.Portion);
+                supplies.Add((LabDistillationData.Feed, 2, -1));
+                supplies.Add((LabMixtureData.Suspension, 1, -1));
+                supplies.Add((LabProcessData.LoadedCrystals, 1, -1));
+                supplies.Add((LabMixtureData.Salt, 1, -1));
+                supplies.Add((LabMixtureData.Chalk, 1, -1));
+                supplies.Add((LabProcessData.SealedSalt, 1, -1));
+                supplies.Add((LabProcessData.SealedChalk, 1, -1));
+                SampleDef advancedSample = SampleTable.All.First(sample => sample.Batch == "13");
+                supplies.Add((advancedSample.ItemId, 2, -1));
+                supplies.Add((advancedSample.DetectedId, 1, -1));
+                supplies.Add((ReagentBottle.GlassEmpties[LabMixtureData.SmallBottle], 4, -1));
+                supplies.Add((ChemistryCatalog.ToolItemId("test_tube"), 1, -1));
+            }
+
             GiveTestSupplies(supplies);
+        }
+
+        private static void AddEquipmentBottle(List<(string Id, int Units, int Size)> supplies, string id, int units)
+        {
+            supplies.Add((id, units, LabMixtureData.SmallBottle));
         }
 
         internal static void GiveMixtureKit()
