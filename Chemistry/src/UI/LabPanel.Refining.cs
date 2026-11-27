@@ -1,3 +1,4 @@
+using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -87,8 +88,8 @@ namespace Chemistry
             else
             {
                 LabUi.Label(builder, Loc.Get("lab_samples_tip",
-                    "液体、气样以及成分报告中可直接分离的成分，仍可使用蒸馏器。",
-                    "Use the Distiller for liquid or gas samples and components available for direct separation."),
+                    "液体和气样可用蒸馏器分离；已检测样品按成分配方回收时，将足量样品放入蒸馏器面板。",
+                    "Use the distiller to separate liquids and gases; for analyzed samples, load the recipe amount into its panel to recover a component."),
                     null, 11.5f, LabUi.RowWidth, 22f, true, ChemUi.Dim, false, TextAlignmentOptions.Left);
             }
 
@@ -113,24 +114,25 @@ namespace Chemistry
         {
             builder.BeginRow(8f, TextAnchor.MiddleLeft);
             ChemUi.RowBackground(builder.CurrentContainer, index);
-            ChemUi.RowLayout(builder.CurrentContainer, LabUi.RowWidth, detected ? 52f : 34f);
+            ChemUi.RowLayout(builder.CurrentContainer, LabUi.RowWidth, detected ? 82f : 34f);
             AddRefiningIcon(builder, sample.SpriteKey, 28f);
 
             string label = sample.DisplayName(detected) + " ×" + count;
             if (detected)
             {
-                label += "\n" + sample.Report() + "\n" +
-                         (System.Array.Exists(sample.Components, component => LabRefining.IsAcidTarget(sample, component.Symbol))
-                             ? Loc.Get("lab_samples_leach_hint", "将已检测废料拖入反应台投料格。", "Drag analyzed scrap into the station input grid.")
-                             : Loc.Get("lab_samples_distill_hint", "把蒸馏器拖到样品上分离。", "Drag the Distiller onto the sample."));
+                label += "\n" + sample.Report();
+                if (System.Array.Exists(sample.Components, component => LabRefining.IsAcidTarget(sample, component.Symbol)))
+                    label += "\n" + Loc.Get("lab_samples_leach_hint", "酸浸：样品和对应酸放入提炼反应台。", "Acid route: load the sample and matching acid into the refining station.");
+                if (sample.Batch != "09" && sample.Components.Any(component => !LabRefining.IsAcidTarget(sample, component.Symbol)))
+                    label += "\n" + Loc.Get("lab_samples_distill_hint", "直接回收：按配方数量放入蒸馏器，选目标后取产物。", "Direct recovery: load the recipe amount into the distiller, select a target and collect the product.");
             }
             else
             {
-                label += "\n" + Loc.Get("lab_samples_unknown_hint", "未检测：把光谱仪拖到这件样品上扫描。",
-                    "Unknown: drag the Spectrometer onto this sample to scan it.");
+                label += "\n" + Loc.Get("lab_samples_unknown_hint", "未检测：双击光谱仪打开面板，把样品放入原料槽扫描。",
+                    "Unknown: double-click the spectrometer, load the sample into its ingredient slot and scan it.");
             }
 
-            LabUi.Label(builder, label, null, 12f, LabUi.RowWidth - 70f, detected ? 50f : 32f, true,
+            LabUi.Label(builder, label, null, 12f, LabUi.RowWidth - 70f, detected ? 80f : 32f, true,
                 ChemUi.Main, false, TextAlignmentOptions.MidlineLeft);
             builder.End();
         }

@@ -27,6 +27,7 @@ namespace Chemistry
         private MachineryButton start;
         private MachineryButton previous;
         private MachineryButton next;
+        private MachineryButton recoveryTarget;
         private long startedAt;
         private int runTicks;
         private int level = 1;
@@ -200,7 +201,7 @@ namespace Chemistry
             {
                 feed = new EquipmentSlot();
                 feed.mayInventoryAddItemFunc = (item, _) => CanLoad(feed, item) && AcceptsInput(item);
-                sections.Add(MachineHelper.Panel(Loc.Pick("样品", "Sample"), MachineryStack.Vertical(load, feed), "input"));
+                sections.Add(MachineHelper.Panel(Loc.Pick("原料", "Ingredients"), MachineryStack.Vertical(load, feed), "input"));
             }
             if (Task == EquipmentTask.Dispense || Task == EquipmentTask.Distill)
             {
@@ -222,6 +223,11 @@ namespace Chemistry
                 next = new MachineryButton(">", () => ChangeLevel(1), 18, 12);
                 controls.Add(MachineryStack.Horizontal(previous, setting, next));
             }
+            if (equipment.Key == "distiller")
+            {
+                recoveryTarget = new MachineryButton(Loc.Pick("回收目标", "Recovery target"), CycleRecoveryTarget, 76, 12);
+                controls.Add(recoveryTarget);
+            }
             // 每台设备优先配专属动画；烧杯与光谱仪保留原有的反应/扫描画面。
             preview = InstrumentAnimPreview.Create(equipment.Key);
             if (preview != null)
@@ -241,10 +247,10 @@ namespace Chemistry
             }
             status = new MachineryText(size: 7, uppercase: false);
             progress = new MachineryProgressBar(width: 114);
-            start = new MachineryButton(equipment.ActionLabel, StartRun, 92, 13);
+            start = new MachineryButton(EquipmentActionLabel(), StartRun, 92, 13);
             controls.AddRange(new PixelElement[] { status, progress, start });
             BuildPeakReadout(controls);
-            sections.Add(MachineHelper.Panel(Loc.Pick("操作", "Controls"), MachineryStack.Vertical(controls.ToArray()), "control").SetMinWidth(134));
+            sections.Add(MachineHelper.Panel(Loc.Pick("配方操作", "Recipe operation"), MachineryStack.Vertical(controls.ToArray()), "control").SetMinWidth(134));
 
             if (equipment.HasOutput || SupportsBrineSampling)
             {
@@ -253,7 +259,7 @@ namespace Chemistry
                 string outputName = Task switch
                 {
                     EquipmentTask.SeparateLayers => Loc.Pick("下层 · 水", "Lower layer · Water"),
-                    EquipmentTask.Distill => Loc.Pick("冷凝液", "Condensate"),
+                    EquipmentTask.Distill => Loc.Pick("产物 / 冷凝液", "Product / condensate"),
                     EquipmentTask.GasCollect => Loc.Pick("气体接收", "Gas output"),
                     _ => Loc.Pick("产物", "Output")
                 };
@@ -287,7 +293,8 @@ namespace Chemistry
                 EquipmentTask.Filter => LabRefining.FindIntermediate(id)?.Filtered == false || LabMixtureData.HasSolids(id)
                     || LabAnalysisData.IsDye(id) || HasProcessSediment(id) || CanCollectAqueous(item, AqueousReactions.Precipitate),
                 EquipmentTask.Distill => AqueousReactions.CanRecoverWater(item) || LabDistillationData.Accepts(id)
-                    || (sample?.Batch == "09" && id == sample.DetectedId),
+                    || (sample?.Batch == "09" && id == sample.DetectedId)
+                    || (equipment.Key == "distiller" && sample != null && id == sample.DetectedId),
                 EquipmentTask.AnalyzeSolid => solidSample || LabWorkflow.CanReadSolid(id),
                 EquipmentTask.AnalyzeFluid => (sample != null && !solidSample) || LabWorkflow.CanReadFluid(id),
                 EquipmentTask.AnalyzeAny => sample != null || LabWorkflow.CanRead(id),
@@ -300,6 +307,21 @@ namespace Chemistry
                 _ => AcceptsProcessInput(item) || AcceptsMixtureInput(item)
             };
         }
+
+        private string EquipmentActionLabel() => Task switch
+        {
+            EquipmentTask.AnalyzeSolid or EquipmentTask.AnalyzeFluid or EquipmentTask.AnalyzeAny => Loc.Pick("检测", "Analyze"),
+            EquipmentTask.Weigh => Loc.Pick("称量", "Weigh"),
+            EquipmentTask.Volume => Loc.Pick("读取体积", "Read volume"),
+            EquipmentTask.Dispense => Loc.Pick("移液", "Transfer"),
+            EquipmentTask.Acidity or EquipmentTask.Conductivity => Loc.Pick("读取", "Read"),
+            EquipmentTask.Settings => Loc.Pick("测试", "Test"),
+            EquipmentTask.GlasswareCycle => equipment.Key == "autoclave"
+                ? Loc.Pick("灭菌", "Sterilize") : Loc.Pick("清洗", "Clean"),
+            EquipmentTask.WaterCycle => Loc.Pick("加热", "Heat"),
+            EquipmentTask.SolidCycle => Loc.Pick("研磨", "Grind"),
+            _ => Loc.Pick("合成", "Craft")
+        };
 
         private static bool IsPortableGlass(GameItem item) =>
             item != null && ReagentBottle.IsGlassEmpty(item.identifier);
@@ -317,7 +339,8 @@ namespace Chemistry
             EquipmentTask.Weigh => Loc.Pick("放入物品", "Place an item"),
             EquipmentTask.Volume or EquipmentTask.Dispense => Loc.Pick("放入液体容器", "Load a liquid container"),
             EquipmentTask.Filter => Loc.Pick("放入悬浊液、浸出液或示踪液", "Load suspension, leachate or tracer"),
-            EquipmentTask.Distill => Loc.Pick("装入可分离的水溶液、醇水或 09 号水样", "Load a supported aqueous or alcohol-water mixture, or sample 09"),
+            EquipmentTask.Distill when equipment.Key == "distiller" => Loc.Pick("装入可分离液体或已检测样品", "Load a supported liquid or analyzed sample"),
+            EquipmentTask.Distill => Loc.Pick("装入可分离的水溶液或醇水", "Load a supported aqueous or alcohol-water mixture"),
             EquipmentTask.AnalyzeFluid => Loc.Pick("放入液体、气体或流体样品", "Load a liquid, gas or fluid sample"),
             EquipmentTask.AnalyzeAny => Loc.Pick("放入元素、试剂或待检样品", "Load an element, reagent or sample"),
             EquipmentTask.Titrate => Loc.Pick("放入滴定教学样品", "Load a titration training sample"),
@@ -377,6 +400,7 @@ namespace Chemistry
                 ? AqueousReactions.Plan(Input, Input.unitCount, Receiver, PourableUnits(Input, Receiver)) : default;
             runTicks = Task switch
             {
+                EquipmentTask.Distill when IsDirectRecovery(Input) => 48,
                 EquipmentTask.Settle => 120,
                 EquipmentTask.Distill => 72 + level * 8,
                 EquipmentTask.Titrate => LabTitration.ReactionTicks,
@@ -424,6 +448,7 @@ namespace Chemistry
             if (!running || LabInventoryGrid.OpenGrid != grid) return;
             running = false;
             bool success = false;
+            string inputId = Input?.identifier;
             try
             {
                 string blocker = Dragging ? Loc.Pick("拖动中，本次操作已取消", "Run cancelled during an item drag") : Blocker();
@@ -440,6 +465,16 @@ namespace Chemistry
             reactionPreview?.Finish(success);
             scanPreview?.Finish(success);
             preview?.Finish(success);
+            if (success && (Task is EquipmentTask.AnalyzeSolid or EquipmentTask.AnalyzeFluid or EquipmentTask.AnalyzeAny)
+                && SampleTable.Find(inputId) is SampleDef analyzedSample)
+            {
+                SampleReportWindow.ShowDetected(analyzedSample, inputId == analyzedSample.DetectedId);
+                if (inputId != analyzedSample.DetectedId)
+                {
+                    try { OrderService.OnSampleAnalyzed(analyzedSample); }
+                    catch (Exception error) { ChemistryMod.Log?.Warning("更新样品检测委托失败：" + error.Message); }
+                }
+            }
             resultLoad = CurrentLoad;
             if (window.IsVisible()) Refresh();
         }
@@ -609,6 +644,16 @@ namespace Chemistry
                 SetDisabled(previous, running || level == 1);
                 SetDisabled(next, running || level == 3);
             }
+            if (recoveryTarget != null)
+            {
+                string[] targets = RecoveryTargets(DirectRecoverySample(Input));
+                if (!targets.Contains(selectedRecoveryTarget)) selectedRecoveryTarget = targets.FirstOrDefault();
+                string targetLabel = targets.Length == 0
+                    ? Loc.Pick("回收目标：—", "Recovery target: —")
+                    : Loc.Pick("回收目标：", "Recover: ") + SampleTable.ElementName(selectedRecoveryTarget);
+                if (recoveryTarget.text != targetLabel) recoveryTarget.SetText(targetLabel);
+                SetDisabled(recoveryTarget, running || targets.Length < 2 || Dragging);
+            }
             var blocker = Blocker();
             bool canStart = blocker == null && !Running && !AcidStation.Running && !LabRefining.Running;
             float elapsed = running ? GameTicks.Progress(startedAt, runTicks) : 0f;
@@ -619,13 +664,16 @@ namespace Chemistry
                 preview.Level = level;
                 preview.Update(InstrumentLoad(input), elapsed, result != null, canStart);
             }
-            string phase = Task == EquipmentTask.Distill ? DistillationPhase(elapsed)
+            string phase = Task == EquipmentTask.Distill && IsDirectRecovery(input)
+                ? Loc.Pick("按成分配方回收…", "Recovering the selected component...")
+                : Task == EquipmentTask.Distill ? DistillationPhase(elapsed)
                 : elapsed < 0.28f ? Loc.Pick("准备中…", "Preparing...")
                 : elapsed < 0.82f ? ProcessPhase() ?? AnalysisPhase() ?? MixturePhase() ?? (equipment.ActionLabel + "…")
                     : Loc.Pick("收集结果…", "Collecting result...");
             string ready = Task == EquipmentTask.Dispense && blocker == null && Input?.identifier != LabMixtureData.Brine
                 ? Loc.Pick("本次转移 ", "Transfer ") + Volume(AmountToDispense(input, Receiver))
                 : Task == EquipmentTask.Distill && blocker == null ? DistillationPreview() : Loc.Pick("就绪", "Ready");
+            start.SetText(IsDirectRecovery(input) ? Loc.Pick("提取产物", "Recover product") : EquipmentActionLabel());
             SetText(status, running ? phase + " " + GameTicks.Label(GameTicks.Remaining(startedAt, runTicks)) : result ?? blocker ?? ready);
             SetDisabled(start, !canStart);
             float value = running ? elapsed : result != null && result != Failed ? 1f : 0f;

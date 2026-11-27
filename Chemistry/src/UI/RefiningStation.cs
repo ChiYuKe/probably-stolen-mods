@@ -192,8 +192,8 @@ namespace Chemistry
             window.Attach(new MachineryPanelRow(
                 MachineHelper.Panel(Loc.Pick("工具", "Tool"), tool, "tool").SetMinWidth(46),
                 MachineHelper.Panel(Loc.Pick("试剂", "Reagent"), reagent, "reagent").SetMinWidth(48),
-                MachineHelper.Panel(Loc.Pick("投料", "Input"), feed, "input"),
-                MachineHelper.Panel(Loc.Pick("反应控制", "Controls"), controls, "control").SetMinWidth(158),
+                MachineHelper.Panel(Loc.Pick("原料", "Ingredients"), feed, "input"),
+                MachineHelper.Panel(Loc.Pick("配方操作", "Recipe operation"), controls, "control").SetMinWidth(158),
                 MachineHelper.Panel(Loc.Pick("产物输出", "Output"), output, "output")));
             ChemFontFix.Attach(window.handler.gameObject);
         }
@@ -217,31 +217,6 @@ namespace Chemistry
                 (sample != null && Array.Exists(sample.Components, part => LabRefining.IsAcidTarget(sample, part.Symbol)));
         }
 
-        public static void OpenLeaching(GameItem acid, GameItem scrap)
-        {
-            if (!AreInLab(acid, scrap, LabRefining.AcidInstructions))
-            {
-                return;
-            }
-            if (AnalyzedSample(scrap.identifier) == null)
-            {
-                Hint(Loc.Pick("先用光谱仪检测废料。", "Scan the scrap with the Spectrometer first."));
-                return;
-            }
-            Open();
-            active?.Load(scrap, active.feed, acid, active.reagent);
-        }
-
-        public static void OpenFiltering(GameItem funnel, GameItem liquid)
-        {
-            if (!AreInLab(funnel, liquid, Loc.Pick("先把漏斗和浸出液放进实验室。", "Bring the funnel and leachate into the lab first.")))
-            {
-                return;
-            }
-            Open();
-            active?.Load(liquid, active.feed, funnel, active.tool);
-        }
-
         public static void OpenIntermediate(LabRefining.Intermediate material)
         {
             GameItem item = LabInventoryGrid.OpenGrid?.FindItem(material.ItemId);
@@ -250,17 +225,6 @@ namespace Chemistry
             {
                 active.Load(item, active.feed);
             }
-        }
-
-        private static bool AreInLab(GameItem first, GameItem second, string hint)
-        {
-            LabInventoryGrid grid = LabInventoryGrid.OpenGrid;
-            if (grid != null && grid.Contains(first) && grid.Contains(second))
-            {
-                return true;
-            }
-            Hint(hint);
-            return false;
         }
 
         private static void Hint(string hint)
@@ -384,10 +348,10 @@ namespace Chemistry
                 : Loc.Pick("目标 ", "Target ") + target);
             targetButton.SetDisabled(load.running || targets.Length < 2);
             prepareButton.SetDisabled(!load.available || LabRefining.Running);
-            prepareButton.SetDescription(Loc.Pick("打开制酸装置，拖入原料、工具和空试剂瓶。",
-                "Open the acid station and load materials, tools and an empty reagent bottle."));
+            prepareButton.SetDescription(Loc.Pick("打开制酸装置，按配方把原料、工具和空试剂瓶放入对应槽位。",
+                "Open the acid station and place the recipe materials, tools and empty reagent bottle in their slots."));
             string stateText = load.feed == null
-                ? Loc.Pick("拖入废料、浸出液或滤液", "Drop scrap, leachate or filtrate")
+                ? Loc.Pick("放入已检测废料、浸出液或滤液", "Load analyzed scrap, leachate or filtrate")
                 : Loc.Pick("已装料", "Loaded") + " ×" + load.count;
             if (acid != null && load.reagent != null && load.reagent != acid.ItemId)
             {

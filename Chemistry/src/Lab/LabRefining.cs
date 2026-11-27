@@ -31,7 +31,7 @@ namespace Chemistry
                 : Loc.Get("refining_leachate", "{0}浸出液", "{0} leachate", SampleTable.ElementName(Symbol));
             public string Instructions => Filtered
                 ? Loc.Get("refining_station_filtrate_hint", "在提炼反应台把滤液送入还原槽。", "Load the filtrate into the reduction cell at the refining station.")
-                : Loc.Get("refining_leachate_hint", "把浸出液拖入投料格，再装入过滤漏斗。", "Load the leachate into the refining station and insert a funnel.");
+                : Loc.Get("refining_leachate_hint", "把浸出液放入提炼反应台投料格，再将过滤漏斗放入工具槽。", "Place the leachate in the refining station input and the filter funnel in its tool slot.");
 
             public Intermediate(string symbol, bool filtered)
             {
@@ -42,8 +42,8 @@ namespace Chemistry
         }
 
         public static string AcidInstructions => Loc.Get("refining_acid_hint",
-            "在提炼反应台把酸拖入试剂槽，把已检测废料拖入投料格。",
-            "Drag acid into the reagent socket and analyzed scrap into the refining station input grid.");
+            "在提炼反应台把酸放入试剂槽，把已检测废料放入投料格，再按配方启动酸浸。",
+            "Place acid in the reagent socket and analyzed scrap in the refining station input, then run the leaching recipe.");
 
         public static Intermediate FindIntermediate(string id)
         {
@@ -218,206 +218,8 @@ namespace Chemistry
             return (UnitsPerProduct + percent - 1) / percent;
         }
 
-        public static string Analyze(SampleDef sample)
-        {
-            if (!LabStorage.Loaded)
-            {
-                LabStorage.EnsureLoaded();
-            }
-            int count = LabStorage.CountOf(sample.ItemId);
-            if (count == 0)
-            {
-                return Loc.Get("lab_samples_missing", "实验室储物格里的样品不足。", "There are not enough samples in lab storage.");
-            }
-
-            if (!LabStorage.TryExchange(sample.ItemId, count, sample.DetectedId, count))
-            {
-                return StorageError();
-            }
-
-            return Loc.Get("lab_samples_analyzed", "已检测 {0} ×{1}", "Analyzed {0} x{1}", sample.Name, count);
-        }
-
-        public static string Refine(SampleDef sample, string symbol)
-        {
-            if (IsAcidTarget(sample, symbol))
-            {
-                return AcidInstructions;
-            }
-            if (!LabStorage.Loaded)
-            {
-                LabStorage.EnsureLoaded();
-            }
-            int percent = Array.Find(sample.Components, c => c.Symbol == symbol).Percent;
-            ElementDef element = ChemistryCatalog.FindElement(symbol);
-            if (percent <= 0 || element == null)
-            {
-                return Loc.Get("lab_samples_no_target", "此样品没有可提炼的目标成分。", "This sample has no such recoverable component.");
-            }
-
-            int needed = SamplesPerProduct(percent);
-            if (LabStorage.CountOf(sample.DetectedId) < needed)
-            {
-                return Loc.Get("lab_samples_missing", "实验室储物格里的样品不足。", "There are not enough samples in lab storage.");
-            }
-
-            if (!LabStorage.TryExchange(sample.DetectedId, needed, element.ItemId, 1))
-            {
-                return StorageError();
-            }
-
-            NotifyRecovered(element);
-
-            return Loc.Get("lab_samples_refined", "提炼完成，{0} ×1 已存入储物格。", "Refined {0} x1 and placed it in lab storage.",
-                SampleTable.ElementName(symbol));
-        }
-
-        /// <summary>
-        /// 拖蒸馏器提炼时用：优先扣实验室储物格里的已检测样品；不够再用店里的，产物也放回店里。
-        /// 这样在当铺里检测完不用先搬进实验室就能提炼。
-        /// </summary>
-        public static string RefineAnywhere(SampleDef sample, string symbol)
-        {
-            if (IsAcidTarget(sample, symbol))
-            {
-                return AcidInstructions;
-            }
-            if (!LabStorage.Loaded)
-            {
-                LabStorage.EnsureLoaded();
-            }
-
-            int percent = Array.Find(sample.Components, c => c.Symbol == symbol).Percent;
-            ElementDef element = ChemistryCatalog.FindElement(symbol);
-            if (percent <= 0 || element == null)
-            {
-                return Loc.Get("lab_samples_no_target", "此样品没有可提炼的目标成分。", "This sample has no such recoverable component.");
-            }
-
-            int needed = SamplesPerProduct(percent);
-            int inLab = LabStorage.CountOf(sample.DetectedId);
-            if (inLab >= needed)
-            {
-                if (!LabStorage.TryExchange(sample.DetectedId, needed, element.ItemId, 1))
-                {
-                    return StorageError();
-                }
-
-                NotifyRecovered(element);
-                return Loc.Get("lab_samples_refined", "提炼完成，{0} ×1 已存入储物格。",
-                    "Refined {0} x1 and placed it in lab storage.", SampleTable.ElementName(symbol));
-            }
-
-            // 店里的样品：先造产物并放好，再扣样品；放不下就不扣。
-            int inStore = 0;
-            try
-            {
-                inStore = StoreInventory.CountUnits().TryGetValue(sample.DetectedId, out int count) ? count : 0;
-            }
-            catch (Exception e)
-            {
-                ChemUi.Log?.Warning("统计店里样品数量失败：" + e.Message);
-                inStore = 0;
-            }
-
-            int fromLab = Math.Min(inLab, needed);
-            int fromStore = needed - fromLab;
-            if (inStore < fromStore)
-            {
-                int have = inLab + inStore;
-                return Loc.Get("lab_samples_missing_anywhere",
-                    "样品不够：提炼 {0} 需要 {1} 份已检测样品（实验室 {2} + 店里 {3}）。",
-                    "Not enough samples: refining {0} needs {1} analyzed samples (lab {2} + store {3}).",
-                    SampleTable.ElementName(symbol), needed, inLab, inStore);
-            }
-
-            // Samples can be split between lab storage and the shop. Convert the lab
-            // portion first so the result has a guaranteed destination, then consume
-            // the remaining shop stock. If that second step fails, reverse the lab swap.
-            if (fromLab > 0)
-            {
-                if (!LabStorage.TryExchange(sample.DetectedId, fromLab, element.ItemId, 1))
-                {
-                    return StorageError();
-                }
-
-                bool consumed;
-                try
-                {
-                    consumed = StoreInventory.TryConsume(sample.DetectedId, fromStore);
-                }
-                catch (Exception e)
-                {
-                    ChemUi.Log?.Warning("扣除当铺样品失败：" + e.Message);
-                    consumed = false;
-                }
-
-                if (!consumed)
-                {
-                    if (!LabStorage.TryExchange(element.ItemId, 1, sample.DetectedId, fromLab))
-                    {
-                        ChemUi.Log?.Error("提炼失败后无法恢复实验室样品：" + sample.DetectedId);
-                    }
-                    return Loc.Get("lab_samples_consume_failed", "扣除样品失败，提炼取消。", "Could not consume the samples; refining cancelled.");
-                }
-
-                ChemUi.InvalidateCounts();
-                NotifyRecovered(element);
-                return Loc.Get("lab_samples_refined_mixed",
-                    "提炼完成，{0} ×1 已存入实验室（实验室 {1} + 当铺 {2} 份样品）。",
-                    "Refined {0} x1 into lab storage (lab {1} + store {2} analyzed samples).",
-                    SampleTable.ElementName(symbol), fromLab, fromStore);
-            }
-
-            GameItem product = null;
-            try
-            {
-                product = ModHelper.SpawnItem(element.ItemId);
-                if (product == null)
-                {
-                    return Loc.Get("lab_samples_spawn_failed", "产物生成失败。", "Could not create the product.");
-                }
-
-                ModHelper.SetItemOwnerShip(product, true);
-                if (!StoreInventory.TryPlace(product))
-                {
-                    product.Destroy();
-                    return Loc.Get("lab_samples_store_full", "店里的仓库放不下产物，先清出空间再提炼。",
-                        "No room in the store for the product; free some space first.");
-                }
-
-                if (!StoreInventory.TryConsume(sample.DetectedId, needed))
-                {
-                    product.Destroy();
-                    return Loc.Get("lab_samples_consume_failed", "扣除样品失败，提炼取消。", "Could not consume the samples; refining cancelled.");
-                }
-            }
-            catch (Exception e)
-            {
-                if (product != null)
-                {
-                    try
-                    {
-                        product.Destroy();
-                    }
-                    catch
-                    {
-                        // 忽略
-                    }
-                }
-
-                ChemUi.Log?.Warning("提炼出错：" + e.Message);
-                return Loc.Get("lab_samples_error", "提炼出错，详情看日志。", "Refining failed; see the log.");
-            }
-
-            ChemUi.InvalidateCounts();
-            NotifyRecovered(element);
-            return Loc.Get("lab_samples_refined_store", "提炼完成，{0} ×1 已放进店里仓库。",
-                "Refined {0} x1 and placed it in the store storage.", SampleTable.ElementName(symbol));
-        }
-
         /// <summary>提炼出单质后推进委托进度（「亲手回收」那一步）。</summary>
-        private static void NotifyRecovered(ElementDef element)
+        internal static void NotifyRecovered(ElementDef element)
         {
             if (element == null)
             {
@@ -434,10 +236,5 @@ namespace Chemistry
             }
         }
 
-        private static string StorageError()
-        {
-            return Loc.Get("lab_samples_storage_error", "未能存入产物。请检查储物格空间后重试。",
-                "Could not store the result. Check the space in lab storage and retry.");
-        }
     }
 }

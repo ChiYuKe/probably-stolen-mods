@@ -125,7 +125,7 @@ F6 打开（模组设置可改键，F9 调试面板也有入口）。四个标�
   `EnsureBackdrop` 按 `Camera.main` 的 orthographicSize/aspect 缩放铺满、对齐相机、sortingOrder=-1000，
   作为 `location.stageObject`；没有背景时退化为 `backgroundKey`。
 - **面板**：游戏创建 `afterhour_location` 窗口后回调 `LabPanel.BuildLauncher`，打开操作面板后有实验台、
-  检测与提炼、储物格和档案。检测和提炼都不走面板按钮：把「光谱仪」拖到未知样品上扫描，弹出成分报告；把「蒸馏器」拖到已检测样品上，弹出提炼界面按成分提炼单质。判定/回调挂在物品自己的 `GameItemFunc` 委托上（每件物品独立，不抢全局钩子）。
+  检测与提炼、储物格和档案。仪器统一通过设备面板操作：把原料、试剂和接收器皿放入对应槽位，按配方启动并从产物槽取回结果。光谱仪将未知样品转为已检测样品并弹出成分报告；蒸馏器可按配方从已检测样品中回收目标单质。设备操作由各自的面板和配方逻辑处理。
 - **场景储物槽**：复用原版 `GameGridInventory`，夜间背包和网格之间可拖放，物品数量与 `LabStorage` 同步。
 - **储物格**：`LabStorage` 是逻辑容量格——24 个格子、1 种物品占 1 格、同类叠加到 999，
   接受化学物品、样品和原版废金属；从店里存入时用 `StoreInventory.TryConsume` 扣店库存，

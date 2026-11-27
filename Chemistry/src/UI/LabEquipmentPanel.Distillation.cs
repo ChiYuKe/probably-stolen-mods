@@ -1,9 +1,37 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Chemistry
 {
     internal sealed partial class LabEquipmentPanel
     {
+        private string selectedRecoveryTarget;
+
+        private static SampleDef DirectRecoverySample(GameItem item)
+        {
+            SampleDef sample = SampleTable.Find(item?.identifier);
+            return sample != null && item.identifier == sample.DetectedId && sample.Batch != "09" ? sample : null;
+        }
+
+        private static string[] RecoveryTargets(SampleDef sample) => sample?.Components
+            .Where(component => !LabRefining.IsAcidTarget(sample, component.Symbol)
+                && ChemistryCatalog.FindElement(component.Symbol) != null)
+            .Select(component => component.Symbol).ToArray() ?? Array.Empty<string>();
+
+        private bool IsDirectRecovery(GameItem item) => equipment?.Key == "distiller"
+            && DirectRecoverySample(item) != null;
+
+        private void CycleRecoveryTarget()
+        {
+            string[] targets = RecoveryTargets(DirectRecoverySample(Input));
+            if (targets.Length < 2 || running || Dragging) return;
+            int index = Array.IndexOf(targets, selectedRecoveryTarget);
+            selectedRecoveryTarget = targets[(index + 1) % targets.Length];
+            result = null;
+            Refresh();
+        }
+
         private string TemperatureText()
         {
             bool vacuum = equipment.Key == "rotary_evaporator";
@@ -13,6 +41,19 @@ namespace Chemistry
 
         private string DistillationBlocker()
         {
+            if (IsDirectRecovery(Input) && DirectRecoverySample(Input) is SampleDef sample)
+            {
+                string[] targets = RecoveryTargets(sample);
+                if (targets.Length == 0)
+                    return Loc.Pick("该样品的可回收成分需要酸浸；请在提炼反应台按配方装料。",
+                        "This sample needs acid leaching. Load the recipe at the refining station.");
+                if (!targets.Contains(selectedRecoveryTarget)) selectedRecoveryTarget = targets[0];
+                var component = Array.Find(sample.Components, part => part.Symbol == selectedRecoveryTarget);
+                int needed = LabRefining.SamplesPerProduct(component.Percent);
+                int available = feed.childItems.Where(item => item.identifier == sample.DetectedId).Sum(item => item.unitCount);
+                return available >= needed ? null
+                    : Loc.Pick($"需要已检测样品 ×{needed}；当前有 {available}。", $"Load {needed} analyzed samples; {available} available.");
+            }
             if (AqueousReactions.CanRecoverWater(Input)) return WaterRecoveryBlocker();
             string reason = LabDistillationData.Blocker(Input.identifier, level);
             if (reason != null) return reason;
@@ -26,6 +67,16 @@ namespace Chemistry
 
         private string DistillationPreview()
         {
+            if (IsDirectRecovery(Input) && DirectRecoverySample(Input) is SampleDef sample)
+            {
+                string[] targets = RecoveryTargets(sample);
+                if (!targets.Contains(selectedRecoveryTarget)) selectedRecoveryTarget = targets.FirstOrDefault();
+                var component = Array.Find(sample.Components, part => part.Symbol == selectedRecoveryTarget);
+                if (component.Symbol == null) return Loc.Pick("该样品没有可直接回收的成分", "No component can be recovered directly from this sample");
+                int needed = LabRefining.SamplesPerProduct(component.Percent);
+                return Loc.Pick($"样品 ×{needed} → {SampleTable.ElementName(component.Symbol)} ×1",
+                    $"Sample ×{needed} → {SampleTable.ElementName(component.Symbol)} ×1");
+            }
             if (AqueousReactions.CanRecoverWater(Input))
             {
                 var recovery = PlanWaterRecovery(Input);
@@ -46,6 +97,7 @@ namespace Chemistry
 
         private string Distill(LabInventoryGrid grid, GameItem input)
         {
+            if (IsDirectRecovery(input) && DirectRecoverySample(input) is SampleDef sample) return RecoverSample(grid, input, sample);
             if (AqueousReactions.CanRecoverWater(input)) return RecoverWater(grid, input);
             GameItem bottle = Receiver;
             var batch = LabDistillationData.Products(input.identifier, level);
@@ -65,6 +117,22 @@ namespace Chemistry
             }
             var inputs = new List<(GameItem, int)> { (input, 1), (bottle, 1) };
             return MachineBatch.TryCommitMeasured(grid, inputs, products.ToArray()) ? summary : Failed;
+        }
+
+        private string RecoverSample(LabInventoryGrid grid, GameItem input, SampleDef sample)
+        {
+            string[] targets = RecoveryTargets(sample);
+            if (targets.Length == 0) return Failed;
+            if (!targets.Contains(selectedRecoveryTarget)) selectedRecoveryTarget = targets[0];
+            var component = Array.Find(sample.Components, part => part.Symbol == selectedRecoveryTarget);
+            ElementDef element = ChemistryCatalog.FindElement(component.Symbol);
+            int needed = LabRefining.SamplesPerProduct(component.Percent);
+            var inputs = new List<(GameItem, int)>();
+            if (element == null || !MachineBatch.AddInputs(inputs, feed, input.identifier, needed)
+                || !MachineBatch.TryCommit(grid, inputs, (element.ItemId, output))) return Failed;
+            LabRefining.NotifyRecovered(element);
+            return Loc.Pick($"已消耗已检测样品 ×{needed}，回收 {SampleTable.ElementName(component.Symbol)} ×1。",
+                $"Consumed {needed} analyzed samples and recovered {SampleTable.ElementName(component.Symbol)} ×1.");
         }
 
         private string WaterRecoveryBlocker()

@@ -609,7 +609,7 @@ namespace Chemistry
             item.unitBaseValue = def.Value;
             item.unitValue = ItemPricing.ToolUnitValue(def);
             item.unitCount = 1;
-            // 光谱仪/蒸馏器要在店里、实验室里都能拖到样品上使用
+            // 允许仪器物品通过自己的面板在地下实验室操作。
             item.canUseOutsideCombat = true;
             // 工具也按质量限叠：烧杯 3 件/格，天平、光谱仪这类重设备每格 1 件。
             int maxStack = ItemMass.MaxStack(ItemMass.UnitMass(def.ItemId), ItemPricing.ToolUnitValue(def));
@@ -632,9 +632,6 @@ namespace Chemistry
                 "边角有磨损，看得出前主人做过不少实验。",
                 "The edges are worn; the previous owner clearly did a lot of experiments.");
 
-            // 光谱仪/蒸馏器：可以拖到样品上做检测/提炼
-            SampleInteraction.Attach(item, def.Key);
-
             string spriteKey = def.Key switch
             {
                 "thermometer" => MaterialItemArt.ThermometerSpriteKey,
@@ -647,7 +644,8 @@ namespace Chemistry
             if (equipment != null)
             {
                 item.shortDescription += "\n"
-                    + Loc.Pick("双击在地下实验室操作。", "Double-click in the underground lab.");
+                    + Loc.Pick("双击打开仪器面板，按槽位放入原料与接收容器，再启动配方。",
+                        "Double-click to open the instrument panel, load ingredients and receivers into their slots, then run the recipe.");
                 if (equipment.PowerKj > 0)
                     item.shortDescription += "\n" + Loc.Pick("耗电设备，需装入电池。", "Battery-powered. Insert a battery to run.");
                 LabEquipmentPanel.Attach(item, equipment);
@@ -704,7 +702,6 @@ namespace Chemistry
 
             if (def.Category == "acid")
             {
-                SampleInteraction.Attach(item, SampleInteraction.AcidInteractionKey);
                 item.canUseOutsideCombat = true;
                 item.longDescription += "\n" + LabRefining.AcidInstructions;
             }

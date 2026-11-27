@@ -347,7 +347,6 @@ namespace Chemistry
                 StoryService.EnsureLoaded();
                 OrderService.EnsureLoaded();
                 LabLocation.EnsureBackdrop();
-                SampleInteraction.AttachExistingTools();
                 ItemRegistration.RestoreSavedFootprints();
             }
             catch (Exception e)

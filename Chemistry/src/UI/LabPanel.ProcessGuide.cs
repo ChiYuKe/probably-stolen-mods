@@ -15,11 +15,11 @@ namespace Chemistry
 
             GuideSection(builder, "一、主线回收：废料 → 单质", "1. Core recovery: scrap to elements");
             GuideLine(builder, "入库与扫描", "Deposit and scan",
-                "在「储物格」把垃圾场的未知样品存入实验室；把光谱仪拖到样品上扫描，报告会列出成分比例与杂质。",
-                "Move unknown samples from the shop into lab storage. Drag the Spectrometer onto a sample to read its composition and impurities.", 58f);
+                "在「储物格」把垃圾场的未知样品存入实验室；双击光谱仪打开面板，将样品放入原料槽扫描，报告会列出成分比例与杂质。",
+                "Move unknown samples from the shop into lab storage. Double-click the Spectrometer, load the sample in its ingredient slot and read its composition and impurities.", 58f);
             GuideLine(builder, "选择分离路线", "Choose a separation route",
-                "按报告选择目标：可直接分离的液体或气体用蒸馏器；反应台会显示酸浸目标对应的酸，按「打开制酸装置」制备，再把样品和酸装入反应台。",
-                "Choose a target from the report. Use the Distiller for direct liquid or gas separation. The refining station shows the acid for each leaching target; use its Acid Station button to prepare it, then load the sample and acid.", 64f);
+                "按报告选择目标：液体或气体用蒸馏器配空瓶分离；非酸浸成分按样品数量配方直接回收。反应台会显示酸浸目标对应的酸，按「打开制酸装置」制备，再把样品和酸装入对应槽位。",
+                "Choose a target from the report. Use the Distiller with an empty bottle to separate liquids and gases, or load the recipe amount of analyzed samples to recover a non-acid target. The refining station shows the acid for each leaching target; use its Acid Station button to prepare it, then load the sample and acid into their slots.", 70f);
             GuideLine(builder, "过滤与还原", "Filter and reduce",
                 "浸出液 → 过滤漏斗 → 滤液 → 还原槽。设备输出格会保留中间物；实验室「检测与提炼」页的接续按钮可把它送进下一台。回收的元素可用于合成或经营。",
                 "Leachate → filter funnel → filtrate → reduction cell. Machine outputs keep intermediates; the follow-up buttons on the lab's Analysis & Refining page load them into the next station. Recovered elements can be used in recipes or sold.", 64f);
