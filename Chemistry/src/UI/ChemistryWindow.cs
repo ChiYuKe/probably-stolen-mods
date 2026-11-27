@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace Chemistry
 {
     /// <summary>
-    /// 实验台窗口：周期表 / 合成台 / 图鉴三个标签页的宿主，负责窗口生命周期。
+    /// 实验台窗口：周期表 / 合成台 / 百科三个标签页的宿主，负责窗口生命周期。
     ///
     /// 下面的公开方法由模组入口（快捷键）和 F9 调试面板调用，名字和签名必须保留：
     /// Initialize(string modId, ModLog log)、IsOpen、Toggle()、Open()、Close()、Shutdown()。
@@ -92,6 +92,8 @@ namespace Chemistry
 
         public static void Close()
         {
+            EncyclopediaPanel.CloseReactionBook();
+            EncyclopediaPanel.CloseFlowGuide();
             CustomUIWindow current = window;
             if (current != null && current.IsAlive && current.Rect != null)
             {
@@ -116,7 +118,8 @@ namespace Chemistry
         /// <summary>模组被禁用/卸载时用：关窗口并丢掉库存快照。</summary>
         public static void Shutdown()
         {
-            CompendiumPanel.CloseReactionBook();
+            EncyclopediaPanel.CloseReactionBook();
+            EncyclopediaPanel.CloseFlowGuide();
             OrderPanel.Shutdown();
             Close();
             ChemUi.InvalidateCounts();
@@ -171,9 +174,9 @@ namespace Chemistry
             SynthesisPanel.BuildPage(builder, window);
             builder.End();
 
-            builder.BeginTab(Loc.Get("tab_compendium", "图鉴", "Compendium"));
+            builder.BeginTab(Loc.Get("tab_compendium", "百科", "Encyclopedia"));
             MakePageFlexible(builder);
-            CompendiumPanel.BuildPage(builder, window);
+            EncyclopediaPanel.BuildPage(builder, window);
             builder.End();
 
             builder.BeginTab(Loc.Get("tab_orders", "委托", "Orders"));
@@ -197,11 +200,11 @@ namespace Chemistry
 
             try
             {
-                CompendiumPanel.Refresh(false);
+                EncyclopediaPanel.Refresh(false);
             }
             catch (Exception e)
             {
-                log?.Warning("填充图鉴失败：" + e.Message);
+                log?.Warning("填充百科失败：" + e.Message);
             }
 
             try
@@ -236,11 +239,11 @@ namespace Chemistry
 
             try
             {
-                CompendiumPanel.Refresh(false);
+                EncyclopediaPanel.Refresh(false);
             }
             catch (Exception e)
             {
-                log?.Warning("刷新图鉴失败：" + e.Message);
+                log?.Warning("刷新百科失败：" + e.Message);
             }
 
             try
@@ -255,6 +258,8 @@ namespace Chemistry
 
         private static void OnWindowClosed()
         {
+            EncyclopediaPanel.CloseReactionBook();
+            EncyclopediaPanel.CloseFlowGuide();
             CustomUIWindow current = window;
             if (current != null && current.IsAlive && current.Rect != null)
             {

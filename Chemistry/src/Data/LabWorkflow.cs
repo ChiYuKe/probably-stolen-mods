@@ -166,9 +166,7 @@ namespace Chemistry
             if (Tools.TryGetValue(id, out ToolDef tool))
             {
                 var equipment = LabEquipmentData.Find(tool.Key);
-                return equipment == null ? Loc.Pick("配方工具或取样器材。", "Use for recipes or sampling.")
-                    : Loc.Pick("在地下实验室双击，执行「", "Double-click in the underground lab to run ") + equipment.ActionLabel
-                        + Loc.Pick("」。", ".");
+                return LabEquipmentData.OperationGuide(equipment);
             }
             if (SampleTable.Find(id) is SampleDef sample)
             {
@@ -186,11 +184,11 @@ namespace Chemistry
             if (ReagentBottle.IsDamaged(id)) return Loc.Pick("拖到废物桶，回收占用的库存空间。", "Drop it onto a solid waste bin to clear inventory space.");
             if (BulkContainers.IsSolidWaste(id)) return Loc.Pick("接收废料和破损容器。", "Accepts scrap and damaged containers.");
             if (BulkContainers.IsLiquidWaste(id)) return Loc.Pick("接收待丢弃的液体。", "Accepts liquid for disposal.");
-            if (ReagentBottle.IsGasEmpty(id)) return Loc.Pick("接收气体，或装入排风柜的接收槽。", "Receive transferred gas or load it in the fume hood.");
-            if (ReagentBottle.IsLiquidEmpty(id)) return Loc.Pick("接收相容液体，可用于分装和设备接收槽。", "Receive compatible liquids during transfers and equipment runs.");
+            if (ReagentBottle.IsGasEmpty(id)) return Loc.Pick("空采样瓶可接收拖动转入的气体，也可装入通风橱接收槽；大钢瓶每次只装一种气体。", "An empty vial receives gas when another bottle is dragged onto it, or fits the fume hood receiver. A cylinder holds one gas type at a time.");
+            if (ReagentBottle.IsLiquidEmpty(id)) return Loc.Pick("拖动装液瓶到空瓶上可分装；先确认玻璃相容性。会腐蚀玻璃的试剂要用塑料瓶。", "Drag a filled bottle onto it to transfer liquid. Check compatibility first; use plastic for reagents that corrode glass.");
             if (id == AcidStation.ItemId || id == RefiningStation.ItemId)
                 return Loc.Pick("在地下实验室双击，打开设备操作面板。", "Double-click in the underground lab to open the machine.");
-            if (NitricProductionData.Find(id) != null) return Loc.Pick("在生产线面板按槽位装配或补料。", "Install or supply it using the production line panel.");
+            if (NitricProductionData.Find(id) != null) return NitricProductionData.Workflow(id);
             if (id == IndustrialFactoryData.Frame) return Loc.Pick("双击厂房，安装设备并选择生产线。", "Open the workshop, install the equipment and choose a route.");
             if (id == IndustrialFactoryData.Transport) return Loc.Pick("装入自动化厂房的运输槽。", "Install in the workshop's transport slot.");
             return null;

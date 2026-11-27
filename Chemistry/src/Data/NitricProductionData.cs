@@ -49,6 +49,18 @@ namespace Chemistry
         internal static string RouteDescription => Loc.Pick("废弃采样气瓶 → 检测、预处理、转化、过滤、灌装",
             "Discarded gas samplers → scan, prepare, convert, filter, fill");
 
+        internal static string Workflow(string id) => id switch
+        {
+            CleanFeed => Loc.Pick("装入硝酸生产线的原料槽，作为氮基进料。", "Load into the nitric line's feed slot as nitrogen feed."),
+            Crude => Loc.Pick("转化阶段产出的未过滤工艺液，送入过滤工位继续处理。", "Unfiltered fluid from the conversion stage; send it to the filtration stage."),
+            Refined => Loc.Pick("过滤后的待灌装工艺液，装入灌装槽并准备空瓶。", "Filtered fluid ready for bottling; load the filling stage and provide empty bottles."),
+            Parts => Loc.Pick("装入生产线的维护槽，用于维修和恢复设备工序。", "Load into the line's maintenance slot to repair and restore a process stage."),
+            Power => Loc.Pick("装入生产线的供能槽，再启动对应工序。", "Insert into the line's power slot before starting a process stage."),
+            LabModule => Loc.Pick("装入地下实验室硝酸生产线的设备槽；双击可打开生产面板。", "Fit to the nitric line's lab machine bay. Double-click to open its production panel."),
+            PipeModule => Loc.Pick("装入自动化厂房的设备槽；双击可打开生产面板并配置联机工序。", "Fit to the workshop machine bay. Double-click to open the panel and configure the linked stages."),
+            _ => Loc.Pick("按生产线面板的槽位提示装配或补料。", "Install or supply it using the production line panel's slot prompts.")
+        };
+
         internal static int FeedUnits(string id, bool allowUnscanned)
         {
             SampleDef sample = SampleTable.Find(id);

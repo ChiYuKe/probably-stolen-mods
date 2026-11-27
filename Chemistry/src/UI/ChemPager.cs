@@ -5,8 +5,7 @@ using UnityEngine;
 namespace Chemistry
 {
     /// <summary>
-    /// 化合物列表的分页控件：550 种化合物一次性铺满 ScrollRect 会很卡，
-    /// 合成台 / 图鉴 / 实验室实验台三处共用这一套「上一页 / 下一页」。
+    /// 合成台 / 百科 / 实验室实验台共用这一套「上一页 / 下一页」。
     /// 分页条放在滚动区里当第一行重建，所以每次刷新都用全新的元素，id 传 null。
     /// </summary>
     internal static class ChemPager
